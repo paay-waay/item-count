@@ -41,7 +41,10 @@
     .metric.primary-metric .metric-value{color:#99461c}
     .metric-detail{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.35}
 
-    .toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-bottom:12px}
+    .toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;margin-bottom:12px}
+    .zone-actions{display:flex;align-items:center;gap:7px}
+    .zone-actions .btn{white-space:nowrap}
+    .zone-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:5px;padding:0 5px;border-radius:99px;background:#ffffff22;color:inherit;font-size:10px}
     .search-wrap{position:relative}
     .search-wrap::before{content:'⌕';position:absolute;left:15px;top:50%;z-index:1;transform:translateY(-52%);color:var(--muted);font-size:23px;line-height:1;pointer-events:none}
     .search-input{min-height:50px;padding:0 48px 0 46px;border-radius:14px;background:var(--card);box-shadow:0 1px 0 #17191605}
@@ -55,6 +58,50 @@
     .filter-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:4px;padding:0 5px;border-radius:99px;background:#ecece8;color:var(--ink);font-size:10px}
     .filter-btn.active .filter-count{background:#ffffff22;color:#fff}
     .visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+
+
+
+    .zone-manager{margin:0 0 12px;padding:15px;border:1px solid var(--line);border-radius:18px;background:var(--card)}
+    .zone-manager[hidden]{display:none}
+    .zone-manager-head{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:12px}
+    .zone-manager-head h2{margin:0;font-size:20px;letter-spacing:-.025em}
+    .zone-manager-head p{margin:4px 0 0;color:var(--muted);font-size:12px}
+    .zone-manager-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+    .zone-list{display:grid;gap:10px}
+    .zone-card{overflow:hidden;border:1px solid var(--line);border-radius:14px;background:#fafaf7}
+    .zone-card-header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:10px}
+    .zone-toggle{display:flex;align-items:center;min-width:0;gap:10px;padding:3px 5px;border:0;background:transparent;text-align:left;color:var(--ink)}
+    .zone-toggle-icon{display:grid;place-items:center;width:28px;height:28px;flex:0 0 auto;border-radius:8px;background:#ecece8;font-size:15px;transition:transform .18s}
+    .zone-card:not(.collapsed) .zone-toggle-icon{transform:rotate(180deg)}
+    .zone-title{min-width:0}
+    .zone-title strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+    .zone-title span{display:block;margin-top:3px;color:var(--muted);font-size:11px}
+    .zone-card-actions{display:flex;align-items:center;gap:5px}
+    .zone-card-body{border-top:1px solid var(--line);background:#fff}
+    .zone-card.collapsed .zone-card-body{display:none}
+    .zone-item-row{display:grid;grid-template-columns:44px minmax(145px,1fr) 88px 88px 108px 112px 64px;gap:9px;align-items:center;min-height:65px;padding:9px 10px;border-bottom:1px solid var(--line)}
+    .zone-item-row:last-child{border-bottom:0}
+    .zone-thumb{width:42px;height:42px;border:1px solid var(--line);border-radius:9px;object-fit:cover;background:#ebece6}
+    .zone-thumb.empty{display:grid;place-items:center;padding:4px;color:var(--muted);font-size:8px;font-weight:700;text-align:center}
+    .zone-item-name{min-width:0}
+    .zone-item-name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+    .zone-item-name span{display:block;margin-top:3px;color:var(--muted);font-size:10px}
+    .zone-number{text-align:center;font-size:14px;font-weight:800;font-variant-numeric:tabular-nums}
+    .zone-number small{display:block;margin-top:2px;color:var(--muted);font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+    .zone-empty{padding:24px 14px;color:var(--muted);font-size:12px;text-align:center}
+    .zone-dialog{width:min(94vw,640px)}
+    .zone-dialog .modal>label{margin-bottom:12px}
+    .zone-select-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;margin-bottom:9px}
+    .zone-item-picker{display:grid;gap:6px;max-height:min(48vh,430px);overflow:auto;padding:1px 3px 1px 1px}
+    .zone-pick-row{display:grid;grid-template-columns:24px 42px minmax(0,1fr) auto;gap:9px;align-items:center;min-height:58px;padding:7px 9px;border:1px solid var(--line);border-radius:11px;background:#f8f8f4;cursor:pointer}
+    .zone-pick-row:hover{background:#f1f1ed}
+    .zone-pick-row input{width:18px;height:18px;min-height:18px;padding:0}
+    .zone-pick-photo{width:40px;height:40px;border:1px solid var(--line);border-radius:8px;object-fit:cover;background:#ebece6}
+    .zone-pick-photo.empty{display:grid;place-items:center;color:var(--muted);font-size:7px;text-align:center}
+    .zone-pick-name{min-width:0}
+    .zone-pick-name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+    .zone-pick-name span{display:block;margin-top:2px;color:var(--muted);font-size:10px}
+    .zone-pick-stock{text-align:right;color:var(--muted);font-size:10px;white-space:nowrap}
 
     .inventory{border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:visible}
     .list-head,.inventory-row{display:grid;grid-template-columns:58px minmax(170px,1fr) 236px 92px 112px 126px 42px 42px;gap:10px;align-items:center}
@@ -150,6 +197,7 @@
     .file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 
     .fab-wrap{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));z-index:8;display:grid;justify-items:center;gap:6px;transform:translateX(-50%)}
+    body.zones-open .fab-wrap{display:none}
     .fab{display:grid;place-items:center;width:62px;height:62px;border:0;border-radius:50%;background:var(--ink);color:#fff;box-shadow:0 14px 34px #1719164d;font-size:37px;font-weight:300;line-height:1}
     .fab:hover{transform:translateY(-1px)}
     .fab-secondary{display:flex;justify-content:center;gap:6px;white-space:nowrap}
@@ -190,6 +238,17 @@
       .dashboard{grid-template-columns:1.15fr .85fr}
       .metric:last-child{grid-column:1/-1;min-height:82px}
       .toolbar{grid-template-columns:1fr}
+      .zone-actions{display:grid;grid-template-columns:1fr 1fr}
+      .zone-manager-head{align-items:flex-start;flex-direction:column}
+      .zone-manager-actions{width:100%;justify-content:flex-start}
+      .zone-item-row{grid-template-columns:42px minmax(0,1fr) 62px 70px;grid-template-areas:"photo name name view" "current current full missing" "confirm confirm confirm confirm";gap:7px;padding:9px}
+      .zone-item-row>.zone-thumb{grid-area:photo}
+      .zone-item-row>.zone-item-name{grid-area:name}
+      .zone-item-row>.zone-current{grid-area:current}
+      .zone-item-row>.zone-full{grid-area:full}
+      .zone-item-row>.zone-missing{grid-area:missing}
+      .zone-item-row>.zone-confirm{grid-area:confirm}
+      .zone-item-row>.zone-view{grid-area:view}
       .filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;overflow:visible}
       .filter-btn{min-width:0;padding:0 5px;font-size:10px}
       .filter-count{min-width:18px;height:18px;margin-left:2px;padding:0 4px;font-size:9px}
@@ -254,6 +313,10 @@
       .batch-remove{width:30px;height:34px}
       .batch-row label{font-size:10px}
       .batch-row input{padding:0 7px}
+      .zone-select-toolbar{grid-template-columns:1fr 1fr}
+      .zone-select-toolbar .zone-search{grid-column:1/-1}
+      .zone-pick-row{grid-template-columns:22px 38px minmax(0,1fr)}
+      .zone-pick-stock{grid-column:3}
       .modal-grid{grid-template-columns:1fr 1fr}
       .modal-grid label:first-child{grid-column:1/-1}
     }
@@ -298,7 +361,23 @@
         <button class="filter-btn" type="button" data-filter="all">All Items <span class="filter-count" id="filterAllCount">0</span></button>
         <button class="filter-btn" type="button" data-filter="full">Fully Stocked <span class="filter-count" id="filterFullCount">0</span></button>
       </nav>
+      <div class="zone-actions">
+        <button class="btn soft small" id="toggleZones" type="button" aria-expanded="false">Zones <span class="zone-count" id="zoneCount">0</span></button>
+        <button class="btn primary small" id="addZone" type="button">+ Zone</button>
+      </div>
     </div>
+
+    <section class="zone-manager" id="zoneManager" aria-label="Zone management" hidden>
+      <header class="zone-manager-head">
+        <div><h2>Zone Management</h2><p>Group existing inventory items without changing or duplicating their stock data.</p></div>
+        <div class="zone-manager-actions">
+          <button class="btn soft small" id="expandAllZones" type="button">Expand all</button>
+          <button class="btn soft small" id="collapseAllZones" type="button">Collapse all</button>
+          <button class="btn primary small" id="addZoneInside" type="button">+ Add Zone</button>
+        </div>
+      </header>
+      <div class="zone-list" id="zoneList"></div>
+    </section>
 
     <section class="inventory" aria-label="Floor stock list">
       <div class="list-head" aria-hidden="true">
@@ -355,6 +434,35 @@
     </form>
   </dialog>
 
+  <dialog class="zone-dialog" id="zoneDialog">
+    <form class="modal" id="zoneForm">
+      <h2 id="zoneDialogTitle">Add Zone</h2>
+      <p>Name the zone, then select any existing inventory items. Removing a zone never deletes its items.</p>
+      <label>Zone Name<input id="zoneName" maxlength="60" placeholder="e.g. Front Wall" autocomplete="off" required></label>
+      <div class="zone-select-toolbar">
+        <input class="zone-search" id="zoneItemSearch" type="search" placeholder="Search inventory" autocomplete="off" spellcheck="false">
+        <button class="btn soft small" id="zoneSelectAll" type="button">Select shown</button>
+        <button class="btn soft small" id="zoneClearAll" type="button">Clear</button>
+      </div>
+      <div class="zone-item-picker" id="zoneItemPicker"></div>
+      <div class="modal-actions">
+        <button class="btn soft" type="button" data-close="zoneDialog">Cancel</button>
+        <button class="btn primary" id="saveZone">Save Zone</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="deleteZoneDialog">
+    <form class="modal" id="deleteZoneForm">
+      <h2>Delete Zone?</h2>
+      <p id="deleteZoneText"></p>
+      <div class="modal-actions">
+        <button class="btn soft" type="button" data-close="deleteZoneDialog">Cancel</button>
+        <button class="btn danger">Delete Zone</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="deleteDialog">
     <form class="modal" id="deleteForm">
       <h2>Delete Item?</h2>
@@ -373,9 +481,10 @@
     'use strict';
 
     const DB_NAME='floor-stock-indexeddb';
-    const DB_VERSION=1;
+    const DB_VERSION=2;
     const ITEMS_STORE='items';
     const META_STORE='meta';
+    const ZONES_STORE='zones';
     const CURRENT_LOCAL_KEY='floor-stock-restock-v2';
     const LEGACY_LOCAL_KEY='photo-inventory-counter-v1';
     const $=selector=>document.querySelector(selector);
@@ -384,16 +493,20 @@
       metricLow:$('#metricLow'),metricLowDetail:$('#metricLowDetail'),metricStock:$('#metricStock'),metricStockDetail:$('#metricStockDetail'),
       filterRestockCount:$('#filterRestockCount'),filterAllCount:$('#filterAllCount'),filterFullCount:$('#filterFullCount'),
       inventorySearch:$('#inventorySearch'),clearSearch:$('#clearSearch'),cameraAdd:$('#cameraAdd'),batchAlbumAdd:$('#batchAlbumAdd'),noPhotoAdd:$('#noPhotoAdd'),
+      toggleZones:$('#toggleZones'),zoneCount:$('#zoneCount'),addZone:$('#addZone'),addZoneInside:$('#addZoneInside'),zoneManager:$('#zoneManager'),zoneList:$('#zoneList'),expandAllZones:$('#expandAllZones'),collapseAllZones:$('#collapseAllZones'),
       quickPhoto:$('#quickPhoto'),batchPhotoInput:$('#batchPhotoInput'),addPhotoInput:$('#addPhotoInput'),editPhotoInput:$('#editPhotoInput'),
       addDialog:$('#addDialog'),addForm:$('#addForm'),addPreview:$('#addPreview'),addName:$('#addName'),addTarget:$('#addTarget'),addOnSite:$('#addOnSite'),
       changeAddPhoto:$('#changeAddPhoto'),removeAddPhoto:$('#removeAddPhoto'),saveAdd:$('#saveAdd'),
       batchDialog:$('#batchDialog'),batchForm:$('#batchForm'),batchItems:$('#batchItems'),batchCount:$('#batchCount'),saveBatch:$('#saveBatch'),
+      zoneDialog:$('#zoneDialog'),zoneForm:$('#zoneForm'),zoneDialogTitle:$('#zoneDialogTitle'),zoneName:$('#zoneName'),zoneItemSearch:$('#zoneItemSearch'),zoneItemPicker:$('#zoneItemPicker'),zoneSelectAll:$('#zoneSelectAll'),zoneClearAll:$('#zoneClearAll'),saveZone:$('#saveZone'),
+      deleteZoneDialog:$('#deleteZoneDialog'),deleteZoneForm:$('#deleteZoneForm'),deleteZoneText:$('#deleteZoneText'),
       deleteDialog:$('#deleteDialog'),deleteForm:$('#deleteForm'),deleteText:$('#deleteText'),toast:$('#toast'),storageNote:$('#storageNote')
     };
 
     const state={
       items:[],expandedId:null,deleteId:null,addPhoto:null,editPhotoTemp:undefined,
       batchDrafts:[],batchProcessing:false,pendingOnSite:{},searchQuery:'',filter:'restock',addOnSiteTouched:false,
+      zones:[],zonesVisible:false,zoneEditId:null,zoneDeleteId:null,zoneDraftItemIds:new Set(),zoneItemQuery:'',collapsedZones:new Set(),
       ready:false
     };
     let db=null;
@@ -429,6 +542,7 @@
           const database=request.result;
           if(!database.objectStoreNames.contains(ITEMS_STORE))database.createObjectStore(ITEMS_STORE,{keyPath:'id'});
           if(!database.objectStoreNames.contains(META_STORE))database.createObjectStore(META_STORE,{keyPath:'key'});
+          if(!database.objectStoreNames.contains(ZONES_STORE))database.createObjectStore(ZONES_STORE,{keyPath:'id'});
         };
         request.onsuccess=()=>resolve(request.result);
         request.onerror=()=>reject(request.error||new Error('Unable to open IndexedDB'));
@@ -472,6 +586,35 @@
         logs:Array.isArray(item.logs)?item.logs:[]
       }
     }
+    function normalizeZone(record,index=0){
+      const fallback=new Date(Date.now()-index*1000).toISOString();
+      return{
+        id:record&&record.id||makeId(),name:String(record&&record.name||`Zone ${index+1}`),
+        itemIds:Array.isArray(record&&record.itemIds)?[...new Set(record.itemIds.filter(id=>typeof id==='string'&&id))]:[],
+        createdAt:validDate(record&&record.createdAt)?record.createdAt:fallback,
+        updatedAt:validDate(record&&record.updatedAt)?record.updatedAt:fallback
+      }
+    }
+    function serializeZone(zone){return{id:zone.id,name:zone.name,itemIds:[...new Set(zone.itemIds||[])],createdAt:zone.createdAt,updatedAt:zone.updatedAt}}
+    async function getAllStoredZones(){
+      const tx=db.transaction(ZONES_STORE,'readonly');
+      const records=await requestPromise(tx.objectStore(ZONES_STORE).getAll());
+      await transactionPromise(tx);return records
+    }
+    async function putZone(zone){
+      const tx=db.transaction(ZONES_STORE,'readwrite');tx.objectStore(ZONES_STORE).put(serializeZone(zone));await transactionPromise(tx)
+    }
+    async function putZones(zones){
+      if(!zones.length)return;const tx=db.transaction(ZONES_STORE,'readwrite'),store=tx.objectStore(ZONES_STORE);zones.forEach(zone=>store.put(serializeZone(zone)));await transactionPromise(tx)
+    }
+    async function removeStoredZone(id){
+      const tx=db.transaction(ZONES_STORE,'readwrite');tx.objectStore(ZONES_STORE).delete(id);await transactionPromise(tx)
+    }
+    async function removeItemAndZoneRefs(id,zones){
+      const tx=db.transaction([ITEMS_STORE,ZONES_STORE],'readwrite');tx.objectStore(ITEMS_STORE).delete(id);const store=tx.objectStore(ZONES_STORE);zones.forEach(zone=>store.put(serializeZone(zone)));await transactionPromise(tx)
+    }
+    async function loadZones(){const records=await getAllStoredZones();return records.map((record,index)=>normalizeZone(record,index))}
+
     async function getMeta(key){
       const tx=db.transaction(META_STORE,'readonly');
       const value=await requestPromise(tx.objectStore(META_STORE).get(key));
@@ -630,8 +773,39 @@
     function statusInfo(item,onSite=item.onSiteQty){const missing=shortage(item,onSite);if(missing>0)return{className:'low',text:`Needs ${missing}`};if(onSite>item.targetQty)return{className:'over',text:`Over by ${onSite-item.targetQty}`};return{className:'full',text:'Fully stocked'}}
     function setFilter(filter){state.filter=filter;document.querySelectorAll('[data-filter]').forEach(button=>button.classList.toggle('active',button.dataset.filter===filter));closeEditTemp();state.expandedId=null;render()}
 
+    function zoneItems(zone){
+      const byId=new Map(state.items.map(item=>[item.id,item]));return (zone.itemIds||[]).map(id=>byId.get(id)).filter(Boolean)
+    }
+    function renderZones(){
+      els.zoneCount.textContent=state.zones.length;els.toggleZones.setAttribute('aria-expanded',String(state.zonesVisible));els.zoneManager.hidden=!state.zonesVisible;document.body.classList.toggle('zones-open',state.zonesVisible);
+      if(!state.zonesVisible)return;
+      if(!state.zones.length){els.zoneList.innerHTML='<div class="zone-empty"><strong>No zones yet.</strong><br>Create a named zone and assign existing inventory items.</div>';return}
+      const zones=[...state.zones].sort((a,b)=>a.name.localeCompare(b.name));
+      els.zoneList.innerHTML=zones.map(zone=>{
+        const items=zoneItems(zone),missing=items.reduce((sum,item)=>sum+shortage(item),0),low=items.filter(item=>shortage(item)>0).length,collapsed=state.collapsedZones.has(zone.id);
+        const rows=items.length?items.map(item=>{
+          const needed=shortage(item),pending=pendingValue(item)!==item.onSiteQty;
+          const confirm=pending?'<button class="restock-btn waiting zone-confirm" type="button" disabled>Save count first</button>':needed?`<button class="restock-btn zone-confirm" type="button" data-zone-action="restock" data-item-id="${item.id}">Restocked +${needed}</button>`:'<button class="restock-btn full zone-confirm" type="button" disabled>Full</button>';
+          return `<div class="zone-item-row" data-zone-item-id="${item.id}">${photoMarkup(item.photo,item.name,'zone-thumb')}<div class="zone-item-name"><strong>${esc(item.name)}</strong><span>${esc(statusInfo(item).text)}</span></div><div class="zone-number zone-current">${item.onSiteQty}<small>On-site</small></div><div class="zone-number zone-full">${item.targetQty}<small>Full</small></div><div class="zone-number zone-missing">${needed}<small>Restock</small></div>${confirm}<button class="btn soft small zone-view" type="button" data-zone-action="view" data-item-id="${item.id}">View</button></div>`
+        }).join(''):'<div class="zone-empty">No items are assigned to this zone.</div>';
+        return `<article class="zone-card${collapsed?' collapsed':''}" data-zone-id="${zone.id}"><header class="zone-card-header"><button class="zone-toggle" type="button" data-zone-action="toggle" aria-expanded="${!collapsed}"><span class="zone-toggle-icon">⌄</span><span class="zone-title"><strong>${esc(zone.name)}</strong><span>${items.length} item${items.length===1?'':'s'} · ${low} low · ${missing} unit${missing===1?'':'s'} to restock</span></span></button><div class="zone-card-actions"><button class="btn soft small" type="button" data-zone-action="edit">Edit</button><button class="icon-btn" type="button" data-zone-action="delete" aria-label="Delete ${esc(zone.name)}">×</button></div></header><div class="zone-card-body">${rows}</div></article>`
+      }).join('')
+    }
+    function zonePickerItems(){
+      const query=normalizeSearch(state.zoneItemQuery);return state.items.map(item=>({item,score:fuzzyScore(item,query)})).filter(result=>Number.isFinite(result.score)).sort((a,b)=>a.score-b.score||a.item.name.localeCompare(b.item.name)).map(result=>result.item)
+    }
+    function renderZonePicker(){
+      const items=zonePickerItems();
+      if(!state.items.length){els.zoneItemPicker.innerHTML='<div class="zone-empty">No inventory items exist yet. You may save an empty zone and add items later.</div>';return}
+      if(!items.length){els.zoneItemPicker.innerHTML='<div class="zone-empty">No matching inventory items.</div>';return}
+      els.zoneItemPicker.innerHTML=items.map(item=>`<label class="zone-pick-row"><input type="checkbox" data-zone-pick value="${item.id}" ${state.zoneDraftItemIds.has(item.id)?'checked':''}>${photoMarkup(item.photo,item.name,'zone-pick-photo')}<span class="zone-pick-name"><strong>${esc(item.name)}</strong><span>${esc(statusInfo(item).text)}</span></span><span class="zone-pick-stock">${item.onSiteQty} / ${item.targetQty} on-site</span></label>`).join('')
+    }
+    function openZoneDialog(zone=null){
+      state.zoneEditId=zone&&zone.id||null;state.zoneDraftItemIds=new Set(zone&&zone.itemIds||[]);state.zoneItemQuery='';els.zoneItemSearch.value='';els.zoneName.value=zone&&zone.name||'';els.zoneDialogTitle.textContent=zone?'Edit Zone':'Add Zone';els.saveZone.textContent=zone?'Save Zone':'Create Zone';renderZonePicker();els.zoneDialog.showModal();setTimeout(()=>els.zoneName.focus(),40)
+    }
+
     function render(){
-      const stats=totals(),percent=stats.target?Math.round(stats.onSite/stats.target*100):0;
+      const stats=totals(),percent=stats.target?Math.round(stats.onSite/stats.target*100):0;renderZones();
       els.summary.textContent=stats.low?`${stats.low} item type${stats.low===1?'':'s'} need ${stats.toRestock} unit${stats.toRestock===1?'':'s'} replenished`:'Everything is fully stocked';
       els.metricRestock.textContent=stats.toRestock;
       els.metricRestockDetail.textContent=stats.toRestock?`${stats.toRestock} unit${stats.toRestock===1?'':'s'} needed across ${stats.low} item type${stats.low===1?'':'s'}`:'No units currently missing';
@@ -750,6 +924,31 @@
     }
     function closeSettings(target){const details=target.closest('details');if(details)details.open=false}
 
+    els.toggleZones.addEventListener('click',()=>{state.zonesVisible=!state.zonesVisible;render();if(state.zonesVisible)setTimeout(()=>els.zoneManager.scrollIntoView({behavior:'smooth',block:'start'}),20)});
+    [els.addZone,els.addZoneInside].forEach(button=>button.addEventListener('click',()=>openZoneDialog(null)));
+    els.expandAllZones.addEventListener('click',()=>{state.collapsedZones.clear();renderZones()});
+    els.collapseAllZones.addEventListener('click',()=>{state.zones.forEach(zone=>state.collapsedZones.add(zone.id));renderZones()});
+    els.zoneItemSearch.addEventListener('input',event=>{state.zoneItemQuery=event.target.value;renderZonePicker()});
+    els.zoneItemPicker.addEventListener('change',event=>{if(!event.target.matches('[data-zone-pick]'))return;if(event.target.checked)state.zoneDraftItemIds.add(event.target.value);else state.zoneDraftItemIds.delete(event.target.value)});
+    els.zoneSelectAll.addEventListener('click',()=>{zonePickerItems().forEach(item=>state.zoneDraftItemIds.add(item.id));renderZonePicker()});
+    els.zoneClearAll.addEventListener('click',()=>{state.zoneDraftItemIds.clear();renderZonePicker()});
+    els.zoneForm.addEventListener('submit',async event=>{
+      event.preventDefault();const name=els.zoneName.value.trim();if(!name){els.zoneName.focus();return notify('Please enter a zone name.')}
+      const now=new Date().toISOString(),existing=state.zones.find(zone=>zone.id===state.zoneEditId);const zone=existing?{...existing,name,itemIds:[...state.zoneDraftItemIds],updatedAt:now}:{id:makeId(),name,itemIds:[...state.zoneDraftItemIds],createdAt:now,updatedAt:now};els.saveZone.disabled=true;
+      try{await putZone(zone);if(existing)Object.assign(existing,zone);else state.zones.push(zone);els.zoneDialog.close();render();notify(existing?'Zone updated.':'Zone created.')}
+      catch(error){storageFailure(error)}finally{els.saveZone.disabled=false}
+    });
+    els.zoneList.addEventListener('click',async event=>{
+      const button=event.target.closest('[data-zone-action]');if(!button)return;const card=button.closest('[data-zone-id]'),zone=card&&state.zones.find(value=>value.id===card.dataset.zoneId),action=button.dataset.zoneAction;
+      if(action==='toggle'&&zone){if(state.collapsedZones.has(zone.id))state.collapsedZones.delete(zone.id);else state.collapsedZones.add(zone.id);renderZones();return}
+      if(action==='edit'&&zone){openZoneDialog(zone);return}
+      if(action==='delete'&&zone){state.zoneDeleteId=zone.id;els.deleteZoneText.textContent=`“${zone.name}” will be deleted. Its ${zoneItems(zone).length} inventory item${zoneItems(zone).length===1?'':'s'} and all stock history will remain unchanged.`;els.deleteZoneDialog.showModal();return}
+      const itemId=button.dataset.itemId,item=state.items.find(value=>value.id===itemId);if(!item)return;
+      if(action==='view'){state.filter='all';state.searchQuery='';els.inventorySearch.value='';document.querySelectorAll('[data-filter]').forEach(filter=>filter.classList.toggle('active',filter.dataset.filter==='all'));state.expandedId=item.id;closeEditTemp();render();requestAnimationFrame(()=>document.querySelector(`.item-record[data-id="${CSS.escape(item.id)}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}));return}
+      if(action==='restock'){const amount=shortage(item);if(amount<=0)return;button.disabled=true;if(await commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:item.targetQty},`Restocked +${amount}`,{restocked:true})){delete state.pendingOnSite[item.id];render();notify(`${item.name} restocked by ${amount}.`)}else button.disabled=false}
+    });
+    els.deleteZoneForm.addEventListener('submit',async event=>{event.preventDefault();const index=state.zones.findIndex(zone=>zone.id===state.zoneDeleteId);if(index<0)return;const zone=state.zones[index],submit=els.deleteZoneForm.querySelector('.danger');submit.disabled=true;try{await removeStoredZone(zone.id);state.zones.splice(index,1);state.collapsedZones.delete(zone.id);state.zoneDeleteId=null;els.deleteZoneDialog.close();render();notify(`Deleted zone ${zone.name}. Inventory items were kept.`)}catch(error){storageFailure(error)}finally{submit.disabled=false}});
+
     els.inventorySearch.addEventListener('input',event=>{state.searchQuery=event.target.value;render()});
     els.clearSearch.addEventListener('click',()=>{state.searchQuery='';els.inventorySearch.value='';render();els.inventorySearch.focus()});
     document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>setFilter(button.dataset.filter)));
@@ -860,11 +1059,11 @@
     });
     els.deleteForm.addEventListener('submit',async event=>{
       event.preventDefault();const index=state.items.findIndex(item=>item.id===state.deleteId);if(index<0)return;const removed=state.items[index],submit=els.deleteForm.querySelector('.danger');submit.disabled=true;
-      try{await removeStoredItem(removed.id);state.items.splice(index,1);revokeUrl(removed.photo);if(state.expandedId===removed.id){state.expandedId=null;closeEditTemp()}delete state.pendingOnSite[removed.id];state.deleteId=null;els.deleteDialog.close();render();notify(`Deleted ${removed.name}.`)}
+      try{const changedZones=state.zones.filter(zone=>zone.itemIds.includes(removed.id)).map(zone=>({...zone,itemIds:zone.itemIds.filter(id=>id!==removed.id),updatedAt:new Date().toISOString()}));await removeItemAndZoneRefs(removed.id,changedZones);changedZones.forEach(changed=>Object.assign(state.zones.find(zone=>zone.id===changed.id),changed));state.items.splice(index,1);revokeUrl(removed.photo);if(state.expandedId===removed.id){state.expandedId=null;closeEditTemp()}delete state.pendingOnSite[removed.id];state.deleteId=null;els.deleteDialog.close();render();notify(`Deleted ${removed.name}.`)}
       catch(error){storageFailure(error)}finally{submit.disabled=false}
     });
     document.addEventListener('click',event=>{const dialogId=event.target.dataset.close;if(dialogId)document.getElementById(dialogId).close();if(!event.target.closest('.settings'))document.querySelectorAll('.settings[open]').forEach(menu=>menu.open=false)});
-    [els.addDialog,els.batchDialog,els.deleteDialog].forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
+    [els.addDialog,els.batchDialog,els.zoneDialog,els.deleteZoneDialog,els.deleteDialog].forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
     els.addDialog.addEventListener('close',()=>{disposePhoto(state.addPhoto);state.addPhoto=null});
     els.batchDialog.addEventListener('close',()=>{state.batchDrafts.forEach(draft=>disposePhoto(draft.photo));state.batchDrafts=[];els.batchItems.innerHTML=''});
 
@@ -878,6 +1077,7 @@
     try{
       db=await openDatabase();
       state.items=await loadItems();
+      state.zones=await loadZones();
       state.ready=true;
       const persistent=await requestPersistentStorage();
       if(els.storageNote)els.storageNote.textContent=persistent?'IndexedDB · persistent automatic history':'IndexedDB · automatic history';
