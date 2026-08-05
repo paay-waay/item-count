@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#151714">
+  <title>Photo Inventory Counter</title>
+  <style>
+    :root{--ink:#171916;--muted:#73776e;--line:#dedfd9;--bg:#f4f4f1;--card:#fff;--accent:#c9ef70;--danger:#a32d27;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg)}button,input{font:inherit}button{cursor:pointer}.shell{width:min(100% - 24px,960px);margin:auto;padding:26px 0 64px}header{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:20px}h1{margin:0;font-size:clamp(29px,5vw,42px);letter-spacing:-.045em}.summary,.note{margin:7px 0 0;color:var(--muted);font-size:13px}
+    .add{padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--card)}.photo-row{display:flex;align-items:center;gap:12px;margin-bottom:13px}.preview{width:76px;height:76px;border:1px solid var(--line);border-radius:13px;object-fit:cover;background:#ebebe6}.preview.empty{display:grid;place-items:center;color:var(--muted);font-size:11px;text-align:center}.file{position:absolute;width:1px;height:1px;opacity:0}.grid{display:grid;grid-template-columns:minmax(0,1fr) 120px auto;gap:9px;align-items:end}label{display:grid;gap:7px;color:var(--muted);font-size:12px;font-weight:650}input{width:100%;min-height:46px;padding:0 13px;border:1px solid var(--line);border-radius:12px;background:#fff;outline:0}input:focus{border-color:#778b43;box-shadow:0 0 0 3px #c9ef7055}
+    .btn{min-height:46px;padding:0 16px;border:0;border-radius:12px;font-weight:720}.primary{background:var(--ink);color:#fff}.soft{display:inline-flex;align-items:center;background:#ecece8;color:var(--ink)}.danger{background:#fbe8e6;color:var(--danger)}.btn:disabled{opacity:.5;cursor:not-allowed}
+    .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:18px}.item{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--card)}.item img,.item .no-photo{display:block;width:100%;aspect-ratio:4/3;background:#e5e5df}.item img{object-fit:cover}.item .no-photo{display:grid;place-items:center;color:var(--muted);font-size:13px;text-align:center}.body{padding:15px}.top{display:flex;justify-content:space-between;align-items:start;gap:8px}.top h2{margin:0;font-size:17px;overflow-wrap:anywhere}.delete{width:34px;height:34px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:20px}.delete:hover{background:#fbe8e6;color:var(--danger)}.count{margin:11px 0 15px;font-size:37px;font-weight:760;letter-spacing:-.04em;font-variant-numeric:tabular-nums}.count small{margin-left:5px;color:var(--muted);font-size:13px;letter-spacing:0}.actions{display:grid;grid-template-columns:52px 1fr 52px;gap:8px}.step,.take{min-height:48px;border-radius:12px}.step{border:1px solid var(--line);background:#f5f5f2;font-size:24px}.take{border:0;background:var(--accent);font-weight:740}.step:disabled,.take:disabled{opacity:.45;cursor:not-allowed}
+    .empty-state{grid-column:1/-1;padding:56px 20px;border:1px dashed #c7c9c1;border-radius:18px;color:var(--muted);text-align:center}.empty-state strong{display:block;margin-bottom:7px;color:var(--ink)}dialog{width:min(92vw,390px);padding:0;border:0;border-radius:18px;box-shadow:0 24px 80px #0003}dialog::backdrop{background:#17191688;backdrop-filter:blur(2px)}.modal{padding:22px}.modal h2{margin:0 0 8px}.modal p{margin:0 0 17px;color:var(--muted);font-size:14px;line-height:1.5}.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));z-index:5;transform:translate(-50%,15px);padding:10px 15px;border-radius:99px;background:var(--ink);color:#fff;font-size:13px;opacity:0;pointer-events:none;transition:.2s}.toast.show{opacity:1;transform:translate(-50%,0)}
+    @media(max-width:620px){.shell{width:calc(100% - 20px);padding-top:18px}.grid{grid-template-columns:1fr 100px}.grid .primary{grid-column:1/-1}.items{grid-template-columns:1fr}.desktop-note{display:none}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header><div><h1>Inventory Counter</h1><p class="summary" id="summary">0 item types · 0 total units</p></div><span class="note desktop-note">Data is stored in this browser</span></header>
+    <section class="add">
+      <div class="photo-row">
+        <div class="preview empty" id="preview">No photo<br>selected</div>
+        <div><label class="btn soft" for="photo">Take Photo / Choose Image</label><input class="file" id="photo" type="file" accept="image/*" capture="environment"><p class="note">Photo optional · Automatically compressed before saving</p></div>
+      </div>
+      <div class="grid">
+        <label>Item Name<input id="name" maxlength="60" placeholder="e.g. White Mug" autocomplete="off"></label>
+        <label>Starting Quantity<input id="initial" type="number" min="0" max="999999" step="1" value="1" inputmode="numeric"></label>
+        <button class="btn primary" id="add">Add Item</button>
+      </div>
+    </section>
+    <section class="items" id="items" aria-live="polite"></section>
+  </main>
+
+  <dialog id="takeDialog"><form class="modal" id="takeForm"><h2>Remove Items</h2><p id="takeText"></p><label>Quantity to Remove<input id="amount" type="number" min="1" step="1" required inputmode="numeric"></label><div class="modal-actions"><button class="btn soft" type="button" data-close="takeDialog">Cancel</button><button class="btn primary">Confirm Removal</button></div></form></dialog>
+  <dialog id="deleteDialog"><form class="modal" id="deleteForm"><h2>Delete Item?</h2><p id="deleteText"></p><div class="modal-actions"><button class="btn soft" type="button" data-close="deleteDialog">Cancel</button><button class="btn danger">Delete Item</button></div></form></dialog>
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+  (()=>{
+    const KEY='photo-inventory-counter-v1', $=s=>document.querySelector(s);
+    const els={items:$('#items'),summary:$('#summary'),photo:$('#photo'),preview:$('#preview'),name:$('#name'),initial:$('#initial'),add:$('#add'),take:$('#takeDialog'),takeForm:$('#takeForm'),takeText:$('#takeText'),amount:$('#amount'),del:$('#deleteDialog'),delForm:$('#deleteForm'),delText:$('#deleteText'),toast:$('#toast')};
+    const state={items:load(),photo:'',active:null};let toastTimer;
+    function load(){try{const v=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(v)?v:[]}catch{return[]}}
+    function save(){try{localStorage.setItem(KEY,JSON.stringify(state.items));return true}catch{notify('Browser storage is full. Please delete some items.');return false}}
+    function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+    function notify(msg){els.toast.textContent=msg;els.toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>els.toast.classList.remove('show'),1800)}
+    function render(){const total=state.items.reduce((s,x)=>s+x.count,0);els.summary.textContent=`${state.items.length} item type${state.items.length===1?'':'s'} · ${total} total unit${total===1?'':'s'}`;if(!state.items.length){els.items.innerHTML='<div class="empty-state"><strong>No items yet</strong>Enter an item name and quantity to create your first record.</div>';return}els.items.innerHTML=state.items.map(x=>`<article class="item" data-id="${x.id}">${x.photo?`<img src="${x.photo}" alt="${esc(x.name)}">`:'<div class="no-photo" aria-label="No photo available">No photo</div>'}<div class="body"><div class="top"><h2>${esc(x.name)}</h2><button class="delete" data-action="delete" aria-label="Delete ${esc(x.name)}">×</button></div><div class="count">${x.count}<small>units</small></div><div class="actions"><button class="step" data-action="minus" ${x.count?'':'disabled'} aria-label="Remove ${esc(x.name)}">−</button><button class="take" data-action="take" ${x.count?'':'disabled'}>Enter Quantity</button><button class="step" data-action="plus" aria-label="Add one ${esc(x.name)}">+</button></div></div></article>`).join('')}
+    function compress(file){return new Promise((resolve,reject)=>{const r=new FileReader;r.onerror=reject;r.onload=()=>{const img=new Image;img.onerror=reject;img.onload=()=>{const max=900,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale)),c=document.createElement('canvas'),ctx=c.getContext('2d',{alpha:false});c.width=w;c.height=h;ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',.68))};img.src=r.result};r.readAsDataURL(file)})}
+    els.photo.addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;if(!f.type.startsWith('image/'))return notify('Please select an image file.');els.add.disabled=true;els.add.textContent='Compressing…';try{state.photo=await compress(f);els.preview.outerHTML=`<img class="preview" id="preview" src="${state.photo}" alt="Photo preview">`;els.preview=$('#preview')}catch{notify('Unable to read this photo.')}els.add.disabled=false;els.add.textContent='Add Item'});
+    els.add.addEventListener('click',()=>{const name=els.name.value.trim(),count=Number(els.initial.value);if(!name){els.name.focus();return notify('Please enter an item name.')}if(!Number.isInteger(count)||count<0)return notify('Please enter a valid whole-number quantity.');if(!state.photo&&!confirm('No photo is selected. Save this item without a photo?'))return;const item={id:crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random(),name,count,photo:state.photo};state.items.unshift(item);if(!save()){state.items.shift();return}state.photo='';els.photo.value='';els.name.value='';els.initial.value='1';els.preview.outerHTML='<div class="preview empty" id="preview">No photo<br>selected</div>';els.preview=$('#preview');render();notify('Item added.')});
+    function openTake(x){state.active=x.id;els.takeText.textContent=`${x.name} currently has ${x.count} unit${x.count===1?'':'s'}.`;els.amount.value='1';els.amount.max=x.count;els.take.showModal();setTimeout(()=>els.amount.select(),20)}
+    els.items.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const x=state.items.find(v=>v.id===b.closest('[data-id]').dataset.id);if(!x)return;if(b.dataset.action==='plus'){x.count++;save();render()}else if(b.dataset.action==='minus'||b.dataset.action==='take')openTake(x);else{state.active=x.id;els.delText.textContent=x.photo?`“${x.name}” and its photo will be permanently deleted. This action cannot be undone.`:`“${x.name}” will be permanently deleted. This action cannot be undone.`;els.del.showModal()}});
+    els.takeForm.addEventListener('submit',e=>{e.preventDefault();const x=state.items.find(v=>v.id===state.active),n=Number(els.amount.value);if(!x||!Number.isInteger(n)||n<1||n>x.count)return notify(`Enter a whole number from 1 to ${x?x.count:1}.`);x.count-=n;save();render();els.take.close();notify(`Removed ${n} unit${n===1?'':'s'}.`)});
+    els.delForm.addEventListener('submit',e=>{e.preventDefault();const i=state.items.findIndex(v=>v.id===state.active);if(i<0)return;const removed=state.items.splice(i,1)[0];save();render();els.del.close();notify(`Deleted ${removed.name}.`)});
+    document.addEventListener('click',e=>{const id=e.target.dataset.close;if(id)document.getElementById(id).close()});[els.take,els.del].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));render();
+  })();
+  </script>
+</body>
+</html>
