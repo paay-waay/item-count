@@ -24,7 +24,7 @@
 
     .inventory{border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:visible}
     .list-head,.inventory-row{
-      display:grid;grid-template-columns:58px minmax(180px,1fr) 164px 124px 124px 42px 42px;
+      display:grid;grid-template-columns:58px minmax(180px,1fr) 218px 124px 124px 42px 42px;
       gap:12px;align-items:center
     }
     .list-head{padding:11px 14px;color:var(--muted);font-size:11px;font-weight:750;letter-spacing:.055em;text-transform:uppercase;border-bottom:1px solid var(--line)}
@@ -39,11 +39,14 @@
     .item-name{min-width:0}
     .item-name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
     .mobile-meta{display:none;margin-top:4px;color:var(--muted);font-size:11px;line-height:1.4}
-    .quick-count{display:grid;grid-template-columns:40px minmax(48px,1fr) 40px;gap:6px;align-items:center}
+    .quick-count{display:grid;grid-template-columns:40px minmax(48px,1fr) 40px 58px;gap:6px;align-items:center}
     .quick-btn{display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid var(--line);border-radius:10px;background:#f5f5f2;color:var(--ink);font-size:22px;line-height:1}
     .quick-btn:hover{background:#ecece8}
     .quick-btn:disabled{opacity:.4;cursor:not-allowed}
     .quick-value{text-align:center;font-size:21px;font-weight:780;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+    .quick-value.pending{color:#52721d}
+    .quick-save{height:40px;padding:0 9px;border:0;border-radius:10px;background:var(--accent);color:var(--ink);font-size:11px;font-weight:800}
+    .quick-save:disabled{background:#ecece8;color:var(--muted);opacity:.65;cursor:not-allowed}
     .date{color:var(--muted);font-size:12px;line-height:1.35}
     .icon-btn{display:grid;place-items:center;width:38px;height:38px;padding:0;border:0;border-radius:10px;background:transparent;color:var(--muted)}
     .icon-btn:hover{background:#ecece8;color:var(--ink)}
@@ -119,12 +122,13 @@
       header{align-items:start}
       .desktop-note{display:none}
       .list-head{display:none}
-      .inventory-row{grid-template-columns:56px minmax(0,1fr) 142px 38px 38px;gap:9px;padding:10px}
+      .inventory-row{grid-template-columns:56px minmax(0,1fr) 180px 38px 38px;gap:9px;padding:10px}
       .inventory-row>.date{display:none}
       .mobile-meta{display:block}
-      .quick-count{grid-template-columns:36px minmax(42px,1fr) 36px;gap:4px}
+      .quick-count{grid-template-columns:36px minmax(42px,1fr) 36px 54px;gap:4px}
       .quick-btn{width:36px;height:36px}
       .quick-value{font-size:19px}
+      .quick-save{height:36px;padding:0 7px;font-size:10px}
       .edit-panel{grid-template-columns:1fr;padding:14px}
       .detail-photo{grid-template-columns:120px 1fr;align-items:start}
       .detail-preview{width:120px}
@@ -132,11 +136,12 @@
     }
     @media(max-width:520px){
       h1{font-size:32px}
-      .inventory-row{grid-template-columns:50px minmax(0,1fr) 124px 34px 34px;gap:7px}
+      .inventory-row{grid-template-columns:50px minmax(0,1fr) 154px 34px 34px;gap:7px}
       .thumb{width:48px;height:48px}
       .icon-btn{width:34px;height:34px}
-      .quick-count{grid-template-columns:32px minmax(38px,1fr) 32px}
-      .quick-btn{width:32px;height:32px;font-size:19px}
+      .quick-count{grid-template-columns:30px minmax(34px,1fr) 30px 48px}
+      .quick-btn{width:30px;height:32px;font-size:19px}
+      .quick-save{height:32px;padding:0 5px;font-size:9px}
       .quick-value{font-size:17px}
       .item-name strong{font-size:14px}
       .edit-fields,.modal-grid{grid-template-columns:1fr}
@@ -230,7 +235,8 @@
       expandedId:null,
       deleteId:null,
       addPhoto:'',
-      editPhotoTemp:undefined
+      editPhotoTemp:undefined,
+      pendingCounts:{}
     };
     let toastTimer;
 
@@ -297,6 +303,16 @@
     function photoMarkup(photo,name,className){
       return photo?`<img class="${className}" src="${photo}" alt="${esc(name)}">`:`<div class="${className} empty" aria-label="No photo available">No photo</div>`
     }
+    function pendingCount(item){
+      const value=state.pendingCounts[item.id];
+      return Number.isInteger(value)?value:item.count
+    }
+    function stageQuantity(item,nextCount){
+      if(!Number.isInteger(nextCount)||nextCount<0||nextCount>999999)return;
+      if(nextCount===item.count)delete state.pendingCounts[item.id];
+      else state.pendingCounts[item.id]=nextCount;
+      render()
+    }
 
     function render(){
       const total=state.items.reduce((sum,item)=>sum+item.count,0);
@@ -311,6 +327,8 @@
     function renderItem(item){
       const expanded=state.expandedId===item.id;
       const stagedPhoto=expanded&&state.editPhotoTemp!==undefined?state.editPhotoTemp:item.photo;
+      const stagedCount=pendingCount(item);
+      const quantityChanged=stagedCount!==item.count;
       return `<article class="item-record${expanded?' expanded':''}" data-id="${item.id}">
         <div class="inventory-row" role="button" tabindex="0" aria-expanded="${expanded}">
           ${photoMarkup(item.photo,item.name,'thumb')}
@@ -319,9 +337,10 @@
             <span class="mobile-meta">Added ${formatDate(item.createdAt)} · Updated ${formatDate(item.updatedAt)}</span>
           </div>
           <div class="quick-count" aria-label="Quick quantity controls for ${esc(item.name)}">
-            <button class="quick-btn" type="button" data-action="quick-minus" ${item.count===0?'disabled':''} aria-label="Subtract one from ${esc(item.name)}">−</button>
-            <span class="quick-value" aria-label="${item.count} units">${item.count}</span>
+            <button class="quick-btn" type="button" data-action="quick-minus" ${stagedCount===0?'disabled':''} aria-label="Subtract one from ${esc(item.name)}">−</button>
+            <span class="quick-value${quantityChanged?' pending':''}" aria-label="${stagedCount} units${quantityChanged?', unsaved':''}">${stagedCount}</span>
             <button class="quick-btn" type="button" data-action="quick-plus" aria-label="Add one to ${esc(item.name)}">+</button>
+            <button class="quick-save" type="button" data-action="quick-save" ${quantityChanged?'':'disabled'} aria-label="Save quantity for ${esc(item.name)}">Save</button>
           </div>
           <div class="date">${formatDate(item.createdAt)}</div>
           <div class="date">${formatDate(item.updatedAt)}</div>
@@ -334,11 +353,11 @@
           </details>
           <button class="icon-btn chevron" type="button" data-action="toggle" aria-label="${expanded?'Collapse':'Expand'} ${esc(item.name)}">⌄</button>
         </div>
-        ${expanded?`<div class="item-details">${renderEditPanel(item,stagedPhoto)}</div>`:''}
+        ${expanded?`<div class="item-details">${renderEditPanel(item,stagedPhoto,stagedCount)}</div>`:''}
       </article>`
     }
 
-    function renderEditPanel(item,photo){
+    function renderEditPanel(item,photo,count){
       return `<form class="edit-panel" data-edit-form>
         <div class="detail-photo">
           ${photoMarkup(photo,item.name,'detail-preview')}
@@ -349,7 +368,7 @@
         </div>
         <div class="edit-fields">
           <label>Item Name<input name="name" maxlength="60" value="${esc(item.name)}" required></label>
-          <label>Current Quantity<input name="count" type="number" min="0" max="999999" step="1" value="${item.count}" inputmode="numeric" required></label>
+          <label>Current Quantity<input name="count" type="number" min="0" max="999999" step="1" value="${count}" inputmode="numeric" required></label>
           <div class="date-info">
             <div><strong>Date added</strong>${formatDateTime(item.createdAt)}</div>
             <div><strong>Last updated</strong>${formatDateTime(item.updatedAt)}</div>
@@ -487,9 +506,21 @@
         if(action==='quick-plus'||action==='quick-minus'){
           const item=state.items.find(value=>value.id===id);
           if(!item)return;
-          const next=item.count+(action==='quick-plus'?1:-1);
+          const next=pendingCount(item)+(action==='quick-plus'?1:-1);
           if(next<0)return;
-          if(commitQuantityChange(item,next,action==='quick-plus'?'Quick +1':'Quick −1')){render();notify(action==='quick-plus'?'Added 1 unit.':'Removed 1 unit.')}
+          stageQuantity(item,next);
+          return
+        }
+        if(action==='quick-save'){
+          const item=state.items.find(value=>value.id===id);
+          if(!item)return;
+          const next=pendingCount(item);
+          if(next===item.count)return;
+          const previous=item.count;
+          if(commitQuantityChange(item,next,'Quantity snapshot')){
+            delete state.pendingCounts[id];
+            render();notify(`Saved ${previous} → ${next}.`)
+          }
           return
         }
         if(action==='delete'){
@@ -500,7 +531,7 @@
         }
         if(action==='edit-photo'){els.editPhotoInput.click();return}
         if(action==='remove-photo'){state.editPhotoTemp=null;render();return}
-        if(action==='cancel-edit'){state.expandedId=null;state.editPhotoTemp=undefined;render();return}
+        if(action==='cancel-edit'){delete state.pendingCounts[id];state.expandedId=null;state.editPhotoTemp=undefined;render();return}
       }
       if(event.target.closest('button,input,label,summary,details,.item-details'))return;
       toggleItem(id)
@@ -531,6 +562,7 @@
       item.updatedAt=now;
       item.logs=[...(item.logs||[]),makeLog(previousCount,count,count===previousCount?'Saved item details':'Saved quantity change',now)];
       if(!save()){Object.assign(item,previous);return}
+      delete state.pendingCounts[item.id];
       state.expandedId=null;state.editPhotoTemp=undefined;render();notify('Item updated.')
     });
 
@@ -541,6 +573,7 @@
       const removed=state.items.splice(index,1)[0];
       if(!save()){state.items.splice(index,0,removed);return}
       if(state.expandedId===removed.id){state.expandedId=null;state.editPhotoTemp=undefined}
+      delete state.pendingCounts[removed.id];
       state.deleteId=null;els.deleteDialog.close();render();notify(`Deleted ${removed.name}.`)
     });
 
