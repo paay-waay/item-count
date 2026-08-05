@@ -4,56 +4,467 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151714">
-  <title>Photo Inventory Counter</title>
+  <title>Inventory Counter</title>
   <style>
-    :root{--ink:#171916;--muted:#73776e;--line:#dedfd9;--bg:#f4f4f1;--card:#fff;--accent:#c9ef70;--danger:#a32d27;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg)}button,input{font:inherit}button{cursor:pointer}.shell{width:min(100% - 24px,960px);margin:auto;padding:26px 0 64px}header{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:20px}h1{margin:0;font-size:clamp(29px,5vw,42px);letter-spacing:-.045em}.summary,.note{margin:7px 0 0;color:var(--muted);font-size:13px}
-    .add{padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--card)}.photo-row{display:flex;align-items:center;gap:12px;margin-bottom:13px}.preview{width:76px;height:76px;border:1px solid var(--line);border-radius:13px;object-fit:cover;background:#ebebe6}.preview.empty{display:grid;place-items:center;color:var(--muted);font-size:11px;text-align:center}.file{position:absolute;width:1px;height:1px;opacity:0}.grid{display:grid;grid-template-columns:minmax(0,1fr) 120px auto;gap:9px;align-items:end}label{display:grid;gap:7px;color:var(--muted);font-size:12px;font-weight:650}input{width:100%;min-height:46px;padding:0 13px;border:1px solid var(--line);border-radius:12px;background:#fff;outline:0}input:focus{border-color:#778b43;box-shadow:0 0 0 3px #c9ef7055}
-    .btn{min-height:46px;padding:0 16px;border:0;border-radius:12px;font-weight:720}.primary{background:var(--ink);color:#fff}.soft{display:inline-flex;align-items:center;background:#ecece8;color:var(--ink)}.danger{background:#fbe8e6;color:var(--danger)}.btn:disabled{opacity:.5;cursor:not-allowed}
-    .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:18px}.item{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--card)}.item img,.item .no-photo{display:block;width:100%;aspect-ratio:4/3;background:#e5e5df}.item img{object-fit:cover}.item .no-photo{display:grid;place-items:center;color:var(--muted);font-size:13px;text-align:center}.body{padding:15px}.top{display:flex;justify-content:space-between;align-items:start;gap:8px}.top h2{margin:0;font-size:17px;overflow-wrap:anywhere}.delete{width:34px;height:34px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:20px}.delete:hover{background:#fbe8e6;color:var(--danger)}.count{margin:11px 0 15px;font-size:37px;font-weight:760;letter-spacing:-.04em;font-variant-numeric:tabular-nums}.count small{margin-left:5px;color:var(--muted);font-size:13px;letter-spacing:0}.actions{display:grid;grid-template-columns:52px 1fr 52px;gap:8px}.step,.take{min-height:48px;border-radius:12px}.step{border:1px solid var(--line);background:#f5f5f2;font-size:24px}.take{border:0;background:var(--accent);font-weight:740}.step:disabled,.take:disabled{opacity:.45;cursor:not-allowed}
-    .empty-state{grid-column:1/-1;padding:56px 20px;border:1px dashed #c7c9c1;border-radius:18px;color:var(--muted);text-align:center}.empty-state strong{display:block;margin-bottom:7px;color:var(--ink)}dialog{width:min(92vw,390px);padding:0;border:0;border-radius:18px;box-shadow:0 24px 80px #0003}dialog::backdrop{background:#17191688;backdrop-filter:blur(2px)}.modal{padding:22px}.modal h2{margin:0 0 8px}.modal p{margin:0 0 17px;color:var(--muted);font-size:14px;line-height:1.5}.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px}.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));z-index:5;transform:translate(-50%,15px);padding:10px 15px;border-radius:99px;background:var(--ink);color:#fff;font-size:13px;opacity:0;pointer-events:none;transition:.2s}.toast.show{opacity:1;transform:translate(-50%,0)}
-    @media(max-width:620px){.shell{width:calc(100% - 20px);padding-top:18px}.grid{grid-template-columns:1fr 100px}.grid .primary{grid-column:1/-1}.items{grid-template-columns:1fr}.desktop-note{display:none}}
+    :root{
+      --ink:#171916;--muted:#73776e;--line:#dedfd9;--bg:#f4f4f1;--card:#fff;
+      --accent:#c9ef70;--danger:#a32d27;--shadow:0 14px 40px #1719161c;
+      font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg)}
+    button,input{font:inherit}
+    button{cursor:pointer}
+    button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #c9ef7088;outline-offset:2px}
+    .shell{width:min(100% - 24px,1040px);margin:auto;padding:28px 0 150px}
+    header{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:22px}
+    h1{margin:0;font-size:clamp(30px,5vw,44px);letter-spacing:-.05em}
+    .summary,.note{margin:7px 0 0;color:var(--muted);font-size:13px}
+    .desktop-note{text-align:right}
+
+    .inventory{border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:visible}
+    .list-head,.inventory-row{
+      display:grid;grid-template-columns:58px minmax(180px,1fr) 92px 132px 132px 42px 42px;
+      gap:12px;align-items:center
+    }
+    .list-head{padding:11px 14px;color:var(--muted);font-size:11px;font-weight:750;letter-spacing:.055em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+    .list-head span:nth-child(3){text-align:right}
+    .item-record{position:relative;border-bottom:1px solid var(--line)}
+    .item-record:last-child{border-bottom:0}
+    .inventory-row{min-height:78px;padding:10px 14px;cursor:pointer;transition:background .15s}
+    .inventory-row:hover{background:#fafaf7}
+    .item-record.expanded>.inventory-row{background:#f8f8f4}
+    .thumb{width:54px;height:54px;border:1px solid var(--line);border-radius:11px;object-fit:cover;background:#ebece6}
+    .thumb.empty{display:grid;place-items:center;padding:5px;color:var(--muted);font-size:9px;font-weight:700;text-align:center;line-height:1.2}
+    .item-name{min-width:0}
+    .item-name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+    .mobile-meta{display:none;margin-top:4px;color:var(--muted);font-size:11px;line-height:1.4}
+    .quantity{text-align:right;font-size:22px;font-weight:780;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+    .date{color:var(--muted);font-size:12px;line-height:1.35}
+    .icon-btn{display:grid;place-items:center;width:38px;height:38px;padding:0;border:0;border-radius:10px;background:transparent;color:var(--muted)}
+    .icon-btn:hover{background:#ecece8;color:var(--ink)}
+    .chevron{font-size:18px;transition:transform .18s}
+    .expanded .chevron{transform:rotate(180deg)}
+
+    .settings{position:relative}
+    .settings summary{list-style:none}
+    .settings summary::-webkit-details-marker{display:none}
+    .settings-menu{position:absolute;top:42px;right:0;z-index:6;width:150px;padding:6px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:var(--shadow)}
+    .menu-btn{width:100%;min-height:40px;padding:0 11px;border:0;border-radius:8px;background:transparent;text-align:left;font-size:13px;font-weight:650}
+    .menu-btn:hover{background:#f2f2ee}
+    .menu-btn.delete{color:var(--danger)}
+
+    .item-details{padding:0 14px 16px;background:#f8f8f4}
+    .edit-panel{display:grid;grid-template-columns:180px minmax(0,1fr);gap:18px;padding:18px;border:1px solid var(--line);border-radius:15px;background:#fff}
+    .detail-photo{display:grid;align-content:start;gap:9px}
+    .detail-preview{width:100%;aspect-ratio:4/3;border:1px solid var(--line);border-radius:13px;object-fit:cover;background:#ebebe6}
+    .detail-preview.empty{display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center}
+    .photo-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .edit-fields{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:13px;align-content:start}
+    label{display:grid;gap:7px;color:var(--muted);font-size:12px;font-weight:680}
+    input{width:100%;min-height:45px;padding:0 13px;border:1px solid var(--line);border-radius:11px;background:#fff;outline:0;color:var(--ink)}
+    input:focus{border-color:#778b43;box-shadow:0 0 0 3px #c9ef7055}
+    .date-info{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;border-radius:11px;background:#f4f4f1;color:var(--muted);font-size:12px;line-height:1.45}
+    .date-info strong{display:block;color:var(--ink);font-size:12px}
+    .form-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:9px;margin-top:3px}
+
+    .empty-state{padding:70px 20px;color:var(--muted);text-align:center}
+    .empty-state strong{display:block;margin-bottom:7px;color:var(--ink);font-size:17px}
+
+    .btn{min-height:44px;padding:0 15px;border:0;border-radius:11px;font-weight:740}
+    .btn.small{min-height:38px;padding:0 10px;font-size:12px}
+    .primary{background:var(--ink);color:#fff}
+    .soft{background:#ecece8;color:var(--ink)}
+    .danger{background:#fbe8e6;color:var(--danger)}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+    .fab-wrap{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));z-index:8;display:grid;justify-items:center;gap:5px;transform:translateX(-50%)}
+    .fab{display:grid;place-items:center;width:62px;height:62px;border:0;border-radius:50%;background:var(--ink);color:#fff;box-shadow:0 14px 34px #1719164d;font-size:37px;font-weight:300;line-height:1}
+    .fab:hover{transform:translateY(-1px)}
+    .no-photo-add{padding:5px 10px;border:0;border-radius:99px;background:#f4f4f1e8;color:var(--ink);font-size:11px;font-weight:720;box-shadow:0 4px 16px #17191614;backdrop-filter:blur(8px)}
+
+    dialog{width:min(92vw,430px);padding:0;border:0;border-radius:18px;box-shadow:0 24px 80px #0003}
+    dialog::backdrop{background:#17191688;backdrop-filter:blur(2px)}
+    .modal{padding:22px}
+    .modal h2{margin:0 0 7px;font-size:23px;letter-spacing:-.025em}
+    .modal>p{margin:0 0 17px;color:var(--muted);font-size:13px;line-height:1.5}
+    .add-preview{width:100%;aspect-ratio:16/8;border:1px solid var(--line);border-radius:13px;object-fit:cover;background:#ebebe6;margin-bottom:13px}
+    .add-preview.empty{display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center}
+    .modal-grid{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:12px}
+    .modal-photo-actions{display:flex;gap:8px;margin:0 0 14px}
+    .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:17px}
+    .toast{position:fixed;left:50%;bottom:calc(116px + env(safe-area-inset-bottom));z-index:12;transform:translate(-50%,15px);padding:10px 15px;border-radius:99px;background:var(--ink);color:#fff;font-size:13px;opacity:0;pointer-events:none;transition:.2s;box-shadow:var(--shadow)}
+    .toast.show{opacity:1;transform:translate(-50%,0)}
+
+    @media(max-width:760px){
+      .shell{width:calc(100% - 20px);padding-top:19px}
+      header{align-items:start}
+      .desktop-note{display:none}
+      .list-head{display:none}
+      .inventory-row{grid-template-columns:56px minmax(0,1fr) 64px 38px 38px;gap:9px;padding:10px}
+      .inventory-row>.date{display:none}
+      .mobile-meta{display:block}
+      .quantity{font-size:20px}
+      .edit-panel{grid-template-columns:1fr;padding:14px}
+      .detail-photo{grid-template-columns:120px 1fr;align-items:start}
+      .detail-preview{width:120px}
+      .photo-actions{grid-template-columns:1fr;align-self:center}
+    }
+    @media(max-width:520px){
+      h1{font-size:32px}
+      .inventory-row{grid-template-columns:50px minmax(0,1fr) 50px 34px 34px;gap:7px}
+      .thumb{width:48px;height:48px}
+      .icon-btn{width:34px;height:34px}
+      .quantity{font-size:18px}
+      .item-name strong{font-size:14px}
+      .edit-fields,.modal-grid{grid-template-columns:1fr}
+      .date-info{grid-template-columns:1fr}
+      .form-actions{display:grid;grid-template-columns:1fr 1fr}
+      .detail-photo{grid-template-columns:1fr}
+      .detail-preview{width:100%}
+      .photo-actions{grid-template-columns:1fr 1fr}
+    }
   </style>
 </head>
 <body>
   <main class="shell">
-    <header><div><h1>Inventory Counter</h1><p class="summary" id="summary">0 item types · 0 total units</p></div><span class="note desktop-note">Data is stored in this browser</span></header>
-    <section class="add">
-      <div class="photo-row">
-        <div class="preview empty" id="preview">No photo<br>selected</div>
-        <div><label class="btn soft" for="photo">Take Photo / Choose Image</label><input class="file" id="photo" type="file" accept="image/*" capture="environment"><p class="note">Photo optional · Automatically compressed before saving</p></div>
+    <header>
+      <div>
+        <h1>Inventory</h1>
+        <p class="summary" id="summary">0 item types · 0 total units</p>
       </div>
-      <div class="grid">
-        <label>Item Name<input id="name" maxlength="60" placeholder="e.g. White Mug" autocomplete="off"></label>
-        <label>Starting Quantity<input id="initial" type="number" min="0" max="999999" step="1" value="1" inputmode="numeric"></label>
-        <button class="btn primary" id="add">Add Item</button>
+      <span class="note desktop-note">Stored in this browser</span>
+    </header>
+
+    <section class="inventory" aria-label="Inventory list">
+      <div class="list-head" aria-hidden="true">
+        <span>Photo</span><span>Item</span><span>Quantity</span><span>Date added</span><span>Last updated</span><span></span><span></span>
       </div>
+      <div id="items" aria-live="polite"></div>
     </section>
-    <section class="items" id="items" aria-live="polite"></section>
   </main>
 
-  <dialog id="takeDialog"><form class="modal" id="takeForm"><h2>Remove Items</h2><p id="takeText"></p><label>Quantity to Remove<input id="amount" type="number" min="1" step="1" required inputmode="numeric"></label><div class="modal-actions"><button class="btn soft" type="button" data-close="takeDialog">Cancel</button><button class="btn primary">Confirm Removal</button></div></form></dialog>
-  <dialog id="deleteDialog"><form class="modal" id="deleteForm"><h2>Delete Item?</h2><p id="deleteText"></p><div class="modal-actions"><button class="btn soft" type="button" data-close="deleteDialog">Cancel</button><button class="btn danger">Delete Item</button></div></form></dialog>
+  <div class="fab-wrap">
+    <button class="fab" id="cameraAdd" type="button" aria-label="Add item with camera">+</button>
+    <button class="no-photo-add" id="noPhotoAdd" type="button">Add without photo</button>
+  </div>
+
+  <input class="file" id="quickPhoto" type="file" accept="image/*" capture="environment">
+  <input class="file" id="addPhotoInput" type="file" accept="image/*" capture="environment">
+  <input class="file" id="editPhotoInput" type="file" accept="image/*" capture="environment">
+
+  <dialog id="addDialog">
+    <form class="modal" id="addForm">
+      <h2>Add Item</h2>
+      <p>Photos are optional. Item name and quantity are required.</p>
+      <div id="addPreview" class="add-preview empty">No photo selected</div>
+      <div class="modal-photo-actions">
+        <button class="btn soft small" type="button" id="changeAddPhoto">Take / Choose Photo</button>
+        <button class="btn soft small" type="button" id="removeAddPhoto">Remove Photo</button>
+      </div>
+      <div class="modal-grid">
+        <label>Item Name<input id="addName" maxlength="60" placeholder="e.g. White Mug" autocomplete="off" required></label>
+        <label>Starting Quantity<input id="addQuantity" type="number" min="0" max="999999" step="1" value="1" inputmode="numeric" required></label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn soft" type="button" data-close="addDialog">Cancel</button>
+        <button class="btn primary" id="saveAdd">Save Item</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="deleteDialog">
+    <form class="modal" id="deleteForm">
+      <h2>Delete Item?</h2>
+      <p id="deleteText"></p>
+      <div class="modal-actions">
+        <button class="btn soft" type="button" data-close="deleteDialog">Cancel</button>
+        <button class="btn danger">Delete Item</button>
+      </div>
+    </form>
+  </dialog>
+
   <div class="toast" id="toast" role="status"></div>
 
   <script>
   (()=>{
-    const KEY='photo-inventory-counter-v1', $=s=>document.querySelector(s);
-    const els={items:$('#items'),summary:$('#summary'),photo:$('#photo'),preview:$('#preview'),name:$('#name'),initial:$('#initial'),add:$('#add'),take:$('#takeDialog'),takeForm:$('#takeForm'),takeText:$('#takeText'),amount:$('#amount'),del:$('#deleteDialog'),delForm:$('#deleteForm'),delText:$('#deleteText'),toast:$('#toast')};
-    const state={items:load(),photo:'',active:null};let toastTimer;
-    function load(){try{const v=JSON.parse(localStorage.getItem(KEY)||'[]');return Array.isArray(v)?v:[]}catch{return[]}}
-    function save(){try{localStorage.setItem(KEY,JSON.stringify(state.items));return true}catch{notify('Browser storage is full. Please delete some items.');return false}}
-    function esc(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-    function notify(msg){els.toast.textContent=msg;els.toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>els.toast.classList.remove('show'),1800)}
-    function render(){const total=state.items.reduce((s,x)=>s+x.count,0);els.summary.textContent=`${state.items.length} item type${state.items.length===1?'':'s'} · ${total} total unit${total===1?'':'s'}`;if(!state.items.length){els.items.innerHTML='<div class="empty-state"><strong>No items yet</strong>Enter an item name and quantity to create your first record.</div>';return}els.items.innerHTML=state.items.map(x=>`<article class="item" data-id="${x.id}">${x.photo?`<img src="${x.photo}" alt="${esc(x.name)}">`:'<div class="no-photo" aria-label="No photo available">No photo</div>'}<div class="body"><div class="top"><h2>${esc(x.name)}</h2><button class="delete" data-action="delete" aria-label="Delete ${esc(x.name)}">×</button></div><div class="count">${x.count}<small>units</small></div><div class="actions"><button class="step" data-action="minus" ${x.count?'':'disabled'} aria-label="Remove ${esc(x.name)}">−</button><button class="take" data-action="take" ${x.count?'':'disabled'}>Enter Quantity</button><button class="step" data-action="plus" aria-label="Add one ${esc(x.name)}">+</button></div></div></article>`).join('')}
-    function compress(file){return new Promise((resolve,reject)=>{const r=new FileReader;r.onerror=reject;r.onload=()=>{const img=new Image;img.onerror=reject;img.onload=()=>{const max=900,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),w=Math.max(1,Math.round(img.naturalWidth*scale)),h=Math.max(1,Math.round(img.naturalHeight*scale)),c=document.createElement('canvas'),ctx=c.getContext('2d',{alpha:false});c.width=w;c.height=h;ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',.68))};img.src=r.result};r.readAsDataURL(file)})}
-    els.photo.addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;if(!f.type.startsWith('image/'))return notify('Please select an image file.');els.add.disabled=true;els.add.textContent='Compressing…';try{state.photo=await compress(f);els.preview.outerHTML=`<img class="preview" id="preview" src="${state.photo}" alt="Photo preview">`;els.preview=$('#preview')}catch{notify('Unable to read this photo.')}els.add.disabled=false;els.add.textContent='Add Item'});
-    els.add.addEventListener('click',()=>{const name=els.name.value.trim(),count=Number(els.initial.value);if(!name){els.name.focus();return notify('Please enter an item name.')}if(!Number.isInteger(count)||count<0)return notify('Please enter a valid whole-number quantity.');if(!state.photo&&!confirm('No photo is selected. Save this item without a photo?'))return;const item={id:crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random(),name,count,photo:state.photo};state.items.unshift(item);if(!save()){state.items.shift();return}state.photo='';els.photo.value='';els.name.value='';els.initial.value='1';els.preview.outerHTML='<div class="preview empty" id="preview">No photo<br>selected</div>';els.preview=$('#preview');render();notify('Item added.')});
-    function openTake(x){state.active=x.id;els.takeText.textContent=`${x.name} currently has ${x.count} unit${x.count===1?'':'s'}.`;els.amount.value='1';els.amount.max=x.count;els.take.showModal();setTimeout(()=>els.amount.select(),20)}
-    els.items.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b)return;const x=state.items.find(v=>v.id===b.closest('[data-id]').dataset.id);if(!x)return;if(b.dataset.action==='plus'){x.count++;save();render()}else if(b.dataset.action==='minus'||b.dataset.action==='take')openTake(x);else{state.active=x.id;els.delText.textContent=x.photo?`“${x.name}” and its photo will be permanently deleted. This action cannot be undone.`:`“${x.name}” will be permanently deleted. This action cannot be undone.`;els.del.showModal()}});
-    els.takeForm.addEventListener('submit',e=>{e.preventDefault();const x=state.items.find(v=>v.id===state.active),n=Number(els.amount.value);if(!x||!Number.isInteger(n)||n<1||n>x.count)return notify(`Enter a whole number from 1 to ${x?x.count:1}.`);x.count-=n;save();render();els.take.close();notify(`Removed ${n} unit${n===1?'':'s'}.`)});
-    els.delForm.addEventListener('submit',e=>{e.preventDefault();const i=state.items.findIndex(v=>v.id===state.active);if(i<0)return;const removed=state.items.splice(i,1)[0];save();render();els.del.close();notify(`Deleted ${removed.name}.`)});
-    document.addEventListener('click',e=>{const id=e.target.dataset.close;if(id)document.getElementById(id).close()});[els.take,els.del].forEach(d=>d.addEventListener('click',e=>{if(e.target===d)d.close()}));render();
+    const KEY='photo-inventory-counter-v1';
+    const $=selector=>document.querySelector(selector);
+    const els={
+      items:$('#items'),summary:$('#summary'),cameraAdd:$('#cameraAdd'),noPhotoAdd:$('#noPhotoAdd'),
+      quickPhoto:$('#quickPhoto'),addPhotoInput:$('#addPhotoInput'),editPhotoInput:$('#editPhotoInput'),
+      addDialog:$('#addDialog'),addForm:$('#addForm'),addPreview:$('#addPreview'),addName:$('#addName'),
+      addQuantity:$('#addQuantity'),changeAddPhoto:$('#changeAddPhoto'),removeAddPhoto:$('#removeAddPhoto'),
+      saveAdd:$('#saveAdd'),deleteDialog:$('#deleteDialog'),deleteForm:$('#deleteForm'),
+      deleteText:$('#deleteText'),toast:$('#toast')
+    };
+
+    const loaded=loadAndMigrate();
+    const state={
+      items:loaded.items,
+      expandedId:null,
+      deleteId:null,
+      addPhoto:'',
+      editPhotoTemp:undefined
+    };
+    let toastTimer;
+
+    if(loaded.changed)persistSilently();
+
+    function makeId(){return crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(16).slice(2)}
+    function validDate(value){return typeof value==='string'&&!Number.isNaN(Date.parse(value))}
+    function loadAndMigrate(){
+      let raw=[];
+      try{const parsed=JSON.parse(localStorage.getItem(KEY)||'[]');raw=Array.isArray(parsed)?parsed:[]}catch{raw=[]}
+      let changed=false;
+      const base=Date.now();
+      const items=raw.map((item,index)=>{
+        const fallback=new Date(base-index*1000).toISOString();
+        const count=Number(item.count);
+        const normalized={
+          id:item.id||makeId(),
+          name:String(item.name||'Untitled Item'),
+          count:Number.isInteger(count)&&count>=0?count:0,
+          photo:typeof item.photo==='string'?item.photo:'',
+          createdAt:validDate(item.createdAt)?item.createdAt:fallback,
+          updatedAt:validDate(item.updatedAt)?item.updatedAt:(validDate(item.createdAt)?item.createdAt:fallback)
+        };
+        if(!item.id||item.name!==normalized.name||item.count!==normalized.count||item.photo!==normalized.photo||item.createdAt!==normalized.createdAt||item.updatedAt!==normalized.updatedAt)changed=true;
+        return normalized;
+      });
+      return{items,changed}
+    }
+    function persistSilently(){try{localStorage.setItem(KEY,JSON.stringify(state.items));return true}catch{return false}}
+    function save(){
+      try{localStorage.setItem(KEY,JSON.stringify(state.items));return true}
+      catch{notify('Browser storage is full. Delete some items or photos and try again.');return false}
+    }
+    function esc(value){return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}
+    function formatDate(value){
+      try{return new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'short',day:'numeric'}).format(new Date(value))}
+      catch{return 'Unknown'}
+    }
+    function formatDateTime(value){
+      try{return new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value))}
+      catch{return 'Unknown'}
+    }
+    function sortedItems(){return [...state.items].sort((a,b)=>Date.parse(b.updatedAt)-Date.parse(a.updatedAt))}
+    function notify(message){
+      els.toast.textContent=message;els.toast.classList.add('show');clearTimeout(toastTimer);
+      toastTimer=setTimeout(()=>els.toast.classList.remove('show'),1900)
+    }
+    function photoMarkup(photo,name,className){
+      return photo?`<img class="${className}" src="${photo}" alt="${esc(name)}">`:`<div class="${className} empty" aria-label="No photo available">No photo</div>`
+    }
+
+    function render(){
+      const total=state.items.reduce((sum,item)=>sum+item.count,0);
+      els.summary.textContent=`${state.items.length} item type${state.items.length===1?'':'s'} · ${total} total unit${total===1?'':'s'}`;
+      if(!state.items.length){
+        els.items.innerHTML='<div class="empty-state"><strong>No inventory yet</strong>Use the + button to photograph your first item, or add one without a photo.</div>';
+        return;
+      }
+      els.items.innerHTML=sortedItems().map(renderItem).join('')
+    }
+
+    function renderItem(item){
+      const expanded=state.expandedId===item.id;
+      const stagedPhoto=expanded&&state.editPhotoTemp!==undefined?state.editPhotoTemp:item.photo;
+      return `<article class="item-record${expanded?' expanded':''}" data-id="${item.id}">
+        <div class="inventory-row" role="button" tabindex="0" aria-expanded="${expanded}">
+          ${photoMarkup(item.photo,item.name,'thumb')}
+          <div class="item-name">
+            <strong>${esc(item.name)}</strong>
+            <span class="mobile-meta">Added ${formatDate(item.createdAt)} · Updated ${formatDate(item.updatedAt)}</span>
+          </div>
+          <div class="quantity" aria-label="${item.count} units">${item.count}</div>
+          <div class="date">${formatDate(item.createdAt)}</div>
+          <div class="date">${formatDate(item.updatedAt)}</div>
+          <details class="settings">
+            <summary class="icon-btn" aria-label="Settings for ${esc(item.name)}">•••</summary>
+            <div class="settings-menu">
+              <button class="menu-btn" type="button" data-action="edit">Edit item</button>
+              <button class="menu-btn delete" type="button" data-action="delete">Delete item</button>
+            </div>
+          </details>
+          <button class="icon-btn chevron" type="button" data-action="toggle" aria-label="${expanded?'Collapse':'Expand'} ${esc(item.name)}">⌄</button>
+        </div>
+        ${expanded?`<div class="item-details">${renderEditPanel(item,stagedPhoto)}</div>`:''}
+      </article>`
+    }
+
+    function renderEditPanel(item,photo){
+      return `<form class="edit-panel" data-edit-form>
+        <div class="detail-photo">
+          ${photoMarkup(photo,item.name,'detail-preview')}
+          <div class="photo-actions">
+            <button class="btn soft small" type="button" data-action="edit-photo">Replace Photo</button>
+            <button class="btn soft small" type="button" data-action="remove-photo" ${photo?'':'disabled'}>Remove Photo</button>
+          </div>
+        </div>
+        <div class="edit-fields">
+          <label>Item Name<input name="name" maxlength="60" value="${esc(item.name)}" required></label>
+          <label>Current Quantity<input name="count" type="number" min="0" max="999999" step="1" value="${item.count}" inputmode="numeric" required></label>
+          <div class="date-info">
+            <div><strong>Date added</strong>${formatDateTime(item.createdAt)}</div>
+            <div><strong>Last updated</strong>${formatDateTime(item.updatedAt)}</div>
+          </div>
+          <div class="form-actions">
+            <button class="btn soft" type="button" data-action="cancel-edit">Cancel</button>
+            <button class="btn primary">Save Changes</button>
+          </div>
+        </div>
+      </form>`
+    }
+
+    function compress(file){
+      return new Promise((resolve,reject)=>{
+        const reader=new FileReader();
+        reader.onerror=reject;
+        reader.onload=()=>{
+          const image=new Image();
+          image.onerror=reject;
+          image.onload=()=>{
+            const max=900;
+            const scale=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));
+            const width=Math.max(1,Math.round(image.naturalWidth*scale));
+            const height=Math.max(1,Math.round(image.naturalHeight*scale));
+            const canvas=document.createElement('canvas');
+            const context=canvas.getContext('2d',{alpha:false});
+            canvas.width=width;canvas.height=height;
+            context.fillStyle='#fff';context.fillRect(0,0,width,height);
+            context.imageSmoothingQuality='high';context.drawImage(image,0,0,width,height);
+            resolve(canvas.toDataURL('image/jpeg',.68))
+          };
+          image.src=reader.result
+        };
+        reader.readAsDataURL(file)
+      })
+    }
+
+    function setAddPreview(){
+      els.addPreview.outerHTML=state.addPhoto
+        ?`<img id="addPreview" class="add-preview" src="${state.addPhoto}" alt="New item photo preview">`
+        :'<div id="addPreview" class="add-preview empty">No photo selected</div>';
+      els.addPreview=$('#addPreview');
+      els.removeAddPhoto.disabled=!state.addPhoto
+    }
+    function openAdd(photo=''){
+      state.addPhoto=photo;
+      els.addForm.reset();
+      els.addQuantity.value='1';
+      setAddPreview();
+      els.addDialog.showModal();
+      setTimeout(()=>els.addName.focus(),50)
+    }
+    async function processPhoto(file,mode){
+      if(!file)return;
+      if(!file.type.startsWith('image/')){notify('Please select an image file.');return}
+      notify('Processing photo…');
+      try{
+        const compressed=await compress(file);
+        if(mode==='quick')openAdd(compressed);
+        if(mode==='add'){state.addPhoto=compressed;setAddPreview()}
+        if(mode==='edit'){state.editPhotoTemp=compressed;render()}
+      }catch{notify('Unable to read this photo.')}
+    }
+
+    function toggleItem(id,forceOpen=false){
+      if(state.expandedId===id&&!forceOpen){state.expandedId=null;state.editPhotoTemp=undefined}
+      else{state.expandedId=id;state.editPhotoTemp=undefined}
+      render()
+    }
+    function closeSettings(target){const details=target.closest('details');if(details)details.open=false}
+
+    els.cameraAdd.addEventListener('click',()=>els.quickPhoto.click());
+    els.noPhotoAdd.addEventListener('click',()=>openAdd(''));
+    els.quickPhoto.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'quick');event.target.value='' });
+    els.addPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'add');event.target.value='' });
+    els.editPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'edit');event.target.value='' });
+    els.changeAddPhoto.addEventListener('click',()=>els.addPhotoInput.click());
+    els.removeAddPhoto.addEventListener('click',()=>{state.addPhoto='';setAddPreview()});
+
+    els.addForm.addEventListener('submit',event=>{
+      event.preventDefault();
+      const name=els.addName.value.trim();
+      const count=Number(els.addQuantity.value);
+      if(!name){els.addName.focus();return notify('Please enter an item name.')}
+      if(!Number.isInteger(count)||count<0)return notify('Please enter a valid whole-number quantity.');
+      if(!state.addPhoto&&!confirm('Save this item without a photo?'))return;
+      const now=new Date().toISOString();
+      const item={id:makeId(),name,count,photo:state.addPhoto,createdAt:now,updatedAt:now};
+      state.items.push(item);
+      if(!save()){state.items.pop();return}
+      els.addDialog.close();state.addPhoto='';render();notify('Item added.')
+    });
+
+    els.items.addEventListener('click',event=>{
+      const actionButton=event.target.closest('[data-action]');
+      const record=event.target.closest('.item-record');
+      if(!record)return;
+      const id=record.dataset.id;
+      if(actionButton){
+        const action=actionButton.dataset.action;
+        if(action==='toggle'||action==='edit'){closeSettings(actionButton);toggleItem(id,action==='edit');return}
+        if(action==='delete'){
+          closeSettings(actionButton);state.deleteId=id;
+          const item=state.items.find(value=>value.id===id);
+          els.deleteText.textContent=`“${item.name}” will be permanently deleted. This action cannot be undone.`;
+          els.deleteDialog.showModal();return
+        }
+        if(action==='edit-photo'){els.editPhotoInput.click();return}
+        if(action==='remove-photo'){state.editPhotoTemp=null;render();return}
+        if(action==='cancel-edit'){state.expandedId=null;state.editPhotoTemp=undefined;render();return}
+      }
+      if(event.target.closest('button,input,label,summary,details,.item-details'))return;
+      toggleItem(id)
+    });
+
+    els.items.addEventListener('keydown',event=>{
+      if((event.key==='Enter'||event.key===' ')&&event.target.classList.contains('inventory-row')){
+        event.preventDefault();toggleItem(event.target.closest('.item-record').dataset.id)
+      }
+    });
+
+    els.items.addEventListener('submit',event=>{
+      const form=event.target.closest('[data-edit-form]');
+      if(!form)return;
+      event.preventDefault();
+      const record=form.closest('.item-record');
+      const item=state.items.find(value=>value.id===record.dataset.id);
+      if(!item)return;
+      const name=form.elements.name.value.trim();
+      const count=Number(form.elements.count.value);
+      if(!name){form.elements.name.focus();return notify('Please enter an item name.')}
+      if(!Number.isInteger(count)||count<0)return notify('Please enter a valid whole-number quantity.');
+      const previous={...item};
+      item.name=name;item.count=count;
+      if(state.editPhotoTemp!==undefined)item.photo=state.editPhotoTemp||'';
+      item.updatedAt=new Date().toISOString();
+      if(!save()){Object.assign(item,previous);return}
+      state.expandedId=null;state.editPhotoTemp=undefined;render();notify('Item updated.')
+    });
+
+    els.deleteForm.addEventListener('submit',event=>{
+      event.preventDefault();
+      const index=state.items.findIndex(item=>item.id===state.deleteId);
+      if(index<0)return;
+      const removed=state.items.splice(index,1)[0];
+      if(!save()){state.items.splice(index,0,removed);return}
+      if(state.expandedId===removed.id){state.expandedId=null;state.editPhotoTemp=undefined}
+      state.deleteId=null;els.deleteDialog.close();render();notify(`Deleted ${removed.name}.`)
+    });
+
+    document.addEventListener('click',event=>{
+      const dialogId=event.target.dataset.close;
+      if(dialogId)document.getElementById(dialogId).close();
+      if(!event.target.closest('.settings'))document.querySelectorAll('.settings[open]').forEach(menu=>menu.open=false)
+    });
+    [els.addDialog,els.deleteDialog].forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
+    els.addDialog.addEventListener('close',()=>{state.addPhoto=''});
+
+    render();
   })();
   </script>
 </body>
