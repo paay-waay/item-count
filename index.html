@@ -266,7 +266,7 @@
         <h1 id="pageTitle">Floor Stock</h1>
         <p class="summary" id="summary">Nothing needs restocking</p>
       </div>
-      <span class="note desktop-note">Stored in this browser</span>
+      <span class="note desktop-note" id="storageNote">IndexedDB · automatic history</span>
     </header>
 
     <section class="dashboard" aria-label="Stock summary">
@@ -369,9 +369,15 @@
   <div class="toast" id="toast" role="status"></div>
 
   <script>
-  (()=>{
-    const KEY='floor-stock-restock-v2';
-    const LEGACY_KEY='photo-inventory-counter-v1';
+  (async()=>{
+    'use strict';
+
+    const DB_NAME='floor-stock-indexeddb';
+    const DB_VERSION=1;
+    const ITEMS_STORE='items';
+    const META_STORE='meta';
+    const CURRENT_LOCAL_KEY='floor-stock-restock-v2';
+    const LEGACY_LOCAL_KEY='photo-inventory-counter-v1';
     const $=selector=>document.querySelector(selector);
     const els={
       items:$('#items'),summary:$('#summary'),metricRestock:$('#metricRestock'),metricRestockDetail:$('#metricRestockDetail'),
@@ -382,16 +388,16 @@
       addDialog:$('#addDialog'),addForm:$('#addForm'),addPreview:$('#addPreview'),addName:$('#addName'),addTarget:$('#addTarget'),addOnSite:$('#addOnSite'),
       changeAddPhoto:$('#changeAddPhoto'),removeAddPhoto:$('#removeAddPhoto'),saveAdd:$('#saveAdd'),
       batchDialog:$('#batchDialog'),batchForm:$('#batchForm'),batchItems:$('#batchItems'),batchCount:$('#batchCount'),saveBatch:$('#saveBatch'),
-      deleteDialog:$('#deleteDialog'),deleteForm:$('#deleteForm'),deleteText:$('#deleteText'),toast:$('#toast')
+      deleteDialog:$('#deleteDialog'),deleteForm:$('#deleteForm'),deleteText:$('#deleteText'),toast:$('#toast'),storageNote:$('#storageNote')
     };
 
-    const loaded=loadAndMigrate();
     const state={
-      items:loaded.items,expandedId:null,deleteId:null,addPhoto:'',editPhotoTemp:undefined,
-      batchDrafts:[],batchProcessing:false,pendingOnSite:{},searchQuery:'',filter:'restock',addOnSiteTouched:false
+      items:[],expandedId:null,deleteId:null,addPhoto:null,editPhotoTemp:undefined,
+      batchDrafts:[],batchProcessing:false,pendingOnSite:{},searchQuery:'',filter:'restock',addOnSiteTouched:false,
+      ready:false
     };
+    let db=null;
     let toastTimer;
-    if(loaded.changed)persistSilently();
 
     function makeId(){return crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(16).slice(2)}
     function validDate(value){return typeof value==='string'&&!Number.isNaN(Date.parse(value))}
@@ -405,49 +411,136 @@
       if(!log||typeof log!=='object')return null;
       const at=validDate(log.at)?log.at:new Date(Date.now()-index*1000).toISOString();
       if(log.before&&log.after){
-        const beforeTarget=toWhole(log.before.targetQty,itemTarget);
-        const beforeOnSite=toWhole(log.before.onSiteQty,0);
-        const afterTarget=toWhole(log.after.targetQty,itemTarget);
-        const afterOnSite=toWhole(log.after.onSiteQty,0);
-        return{id:log.id||makeId(),at,action:String(log.action||'Saved stock snapshot'),before:{targetQty:beforeTarget,onSiteQty:beforeOnSite},after:{targetQty:afterTarget,onSiteQty:afterOnSite}}
+        return{
+          id:log.id||makeId(),at,action:String(log.action||'Saved stock snapshot'),
+          before:{targetQty:toWhole(log.before.targetQty,itemTarget),onSiteQty:toWhole(log.before.onSiteQty,0)},
+          after:{targetQty:toWhole(log.after.targetQty,itemTarget),onSiteQty:toWhole(log.after.onSiteQty,0)}
+        }
       }
       const from=toWhole(log.from,0),to=toWhole(log.to,0);
       return{id:log.id||makeId(),at,action:String(log.action||'Legacy quantity snapshot'),before:{targetQty:itemTarget,onSiteQty:from},after:{targetQty:itemTarget,onSiteQty:to}}
     }
-    function loadAndMigrate(){
-      let raw=[],usedLegacy=false;
-      try{
-        const current=JSON.parse(localStorage.getItem(KEY)||'null');
-        if(Array.isArray(current))raw=current;
-        else{
-          const legacy=JSON.parse(localStorage.getItem(LEGACY_KEY)||'[]');
-          if(Array.isArray(legacy)){raw=legacy;usedLegacy=legacy.length>0}
-        }
-      }catch{raw=[]}
-      let changed=usedLegacy;
-      const base=Date.now();
-      const items=raw.map((item,index)=>{
-        const fallback=new Date(base-index*1000).toISOString();
-        const legacyCount=toWhole(item.count,0);
-        const targetQty=toWhole(item.targetQty,legacyCount);
-        const onSiteQty=toWhole(item.onSiteQty,legacyCount);
-        const createdAt=validDate(item.createdAt)?item.createdAt:fallback;
-        const updatedAt=validDate(item.updatedAt)?item.updatedAt:createdAt;
-        const normalized={
-          id:item.id||makeId(),name:String(item.name||'Untitled Item'),photo:typeof item.photo==='string'?item.photo:'',
-          targetQty,onSiteQty,createdAt,updatedAt,lastRestockedAt:validDate(item.lastRestockedAt)?item.lastRestockedAt:'',
-          logs:Array.isArray(item.logs)?item.logs.map((log,logIndex)=>normalizeLog(log,targetQty,logIndex)).filter(Boolean):[]
+    function requestPromise(request){return new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error('IndexedDB request failed'))})}
+    function transactionPromise(transaction){return new Promise((resolve,reject)=>{transaction.oncomplete=()=>resolve();transaction.onerror=()=>reject(transaction.error||new Error('IndexedDB transaction failed'));transaction.onabort=()=>reject(transaction.error||new Error('IndexedDB transaction aborted'))})}
+    function openDatabase(){
+      return new Promise((resolve,reject)=>{
+        const request=indexedDB.open(DB_NAME,DB_VERSION);
+        request.onupgradeneeded=()=>{
+          const database=request.result;
+          if(!database.objectStoreNames.contains(ITEMS_STORE))database.createObjectStore(ITEMS_STORE,{keyPath:'id'});
+          if(!database.objectStoreNames.contains(META_STORE))database.createObjectStore(META_STORE,{keyPath:'key'});
         };
-        if(!item.id||item.targetQty!==targetQty||item.onSiteQty!==onSiteQty||item.count!==undefined||!Array.isArray(item.logs))changed=true;
-        return normalized
-      });
-      return{items,changed}
+        request.onsuccess=()=>resolve(request.result);
+        request.onerror=()=>reject(request.error||new Error('Unable to open IndexedDB'));
+        request.onblocked=()=>reject(new Error('Database upgrade is blocked by another open tab'));
+      })
     }
-    function persistSilently(){try{localStorage.setItem(KEY,JSON.stringify(state.items));return true}catch{return false}}
-    function save(){
-      try{localStorage.setItem(KEY,JSON.stringify(state.items));return true}
-      catch{notify('Browser storage is full. Delete some items or photos and try again.');return false}
+    function dataUrlToBlob(dataUrl){
+      if(typeof dataUrl!=='string'||!dataUrl.startsWith('data:'))return null;
+      try{
+        const parts=dataUrl.split(','),header=parts[0],payload=parts.slice(1).join(',');
+        const mime=(header.match(/^data:([^;]+)/)||[])[1]||'image/jpeg';
+        const binary=header.includes(';base64')?atob(payload):decodeURIComponent(payload);
+        const bytes=new Uint8Array(binary.length);
+        for(let index=0;index<binary.length;index++)bytes[index]=binary.charCodeAt(index);
+        return new Blob([bytes],{type:mime})
+      }catch{return null}
     }
+    function objectUrl(blob){return blob instanceof Blob?URL.createObjectURL(blob):''}
+    function revokeUrl(url){if(typeof url==='string'&&url.startsWith('blob:'))URL.revokeObjectURL(url)}
+    function normalizeStoredItem(record,index=0){
+      const fallback=new Date(Date.now()-index*1000).toISOString();
+      const legacyCount=toWhole(record&&record.count,0);
+      const targetQty=toWhole(record&&record.targetQty,legacyCount);
+      const onSiteQty=toWhole(record&&record.onSiteQty,legacyCount);
+      const createdAt=validDate(record&&record.createdAt)?record.createdAt:fallback;
+      const updatedAt=validDate(record&&record.updatedAt)?record.updatedAt:createdAt;
+      const logs=Array.isArray(record&&record.logs)?record.logs.map((log,logIndex)=>normalizeLog(log,targetQty,logIndex)).filter(Boolean):[];
+      const photoBlob=record&&record.photoBlob instanceof Blob?record.photoBlob:dataUrlToBlob(record&&record.photo);
+      const item={
+        id:record&&record.id||makeId(),name:String(record&&record.name||'Untitled Item'),targetQty,onSiteQty,
+        createdAt,updatedAt,lastRestockedAt:validDate(record&&record.lastRestockedAt)?record.lastRestockedAt:'',
+        photoBlob:photoBlob||null,photo:objectUrl(photoBlob),logs
+      };
+      if(!item.logs.length)item.logs=[makeLog('Imported existing stock',{targetQty:0,onSiteQty:0},snapshot(item),createdAt)];
+      return item
+    }
+    function serializeItem(item){
+      return{
+        id:item.id,name:item.name,targetQty:item.targetQty,onSiteQty:item.onSiteQty,createdAt:item.createdAt,updatedAt:item.updatedAt,
+        lastRestockedAt:item.lastRestockedAt||'',photoBlob:item.photoBlob instanceof Blob?item.photoBlob:null,
+        logs:Array.isArray(item.logs)?item.logs:[]
+      }
+    }
+    async function getMeta(key){
+      const tx=db.transaction(META_STORE,'readonly');
+      const value=await requestPromise(tx.objectStore(META_STORE).get(key));
+      await transactionPromise(tx);
+      return value
+    }
+    async function putMeta(key,value){
+      const tx=db.transaction(META_STORE,'readwrite');
+      tx.objectStore(META_STORE).put({key,value,updatedAt:new Date().toISOString()});
+      await transactionPromise(tx)
+    }
+    async function getAllStoredItems(){
+      const tx=db.transaction(ITEMS_STORE,'readonly');
+      const records=await requestPromise(tx.objectStore(ITEMS_STORE).getAll());
+      await transactionPromise(tx);
+      return records
+    }
+    async function putItem(item){
+      const tx=db.transaction(ITEMS_STORE,'readwrite');
+      tx.objectStore(ITEMS_STORE).put(serializeItem(item));
+      await transactionPromise(tx)
+    }
+    async function putItems(items){
+      const tx=db.transaction(ITEMS_STORE,'readwrite'),store=tx.objectStore(ITEMS_STORE);
+      items.forEach(item=>store.put(serializeItem(item)));
+      await transactionPromise(tx)
+    }
+    async function removeStoredItem(id){
+      const tx=db.transaction(ITEMS_STORE,'readwrite');
+      tx.objectStore(ITEMS_STORE).delete(id);
+      await transactionPromise(tx)
+    }
+    function readLegacyArray(){
+      try{
+        const current=JSON.parse(localStorage.getItem(CURRENT_LOCAL_KEY)||'null');
+        if(Array.isArray(current)&&current.length)return current;
+        const legacy=JSON.parse(localStorage.getItem(LEGACY_LOCAL_KEY)||'null');
+        if(Array.isArray(legacy)&&legacy.length)return legacy
+      }catch{}
+      return[]
+    }
+    async function migrateLocalStorage(){
+      const raw=readLegacyArray();
+      if(!raw.length)return[];
+      notify(`Migrating ${raw.length} item${raw.length===1?'':'s'} to the new database…`);
+      const items=raw.map((record,index)=>normalizeStoredItem(record,index));
+      await putItems(items);
+      await putMeta('localStorageMigration',{complete:true,count:items.length});
+      try{localStorage.removeItem(CURRENT_LOCAL_KEY);localStorage.removeItem(LEGACY_LOCAL_KEY)}catch{}
+      return items
+    }
+    async function loadItems(){
+      const records=await getAllStoredItems();
+      if(records.length){
+        const migration=await getMeta('localStorageMigration').catch(()=>null);
+        if(migration&&migration.value&&migration.value.complete){try{localStorage.removeItem(CURRENT_LOCAL_KEY);localStorage.removeItem(LEGACY_LOCAL_KEY)}catch{}}
+        return records.map((record,index)=>normalizeStoredItem(record,index))
+      }
+      return migrateLocalStorage()
+    }
+    async function requestPersistentStorage(){
+      if(!navigator.storage||typeof navigator.storage.persist!=='function')return false;
+      try{return await navigator.storage.persist()}catch{return false}
+    }
+    function storageFailure(error){
+      console.error(error);
+      notify('Unable to save to the browser database. Keep this tab open and try again.');
+    }
+
     function esc(value){return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}
     function formatDate(value){try{return new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'short',day:'numeric'}).format(new Date(value))}catch{return 'Unknown'}}
     function formatDateTime(value){try{return new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value))}catch{return 'Unknown'}}
@@ -509,25 +602,17 @@
     function updateQuickRow(record,item,next){
       const isPending=next!==item.onSiteQty,status=statusInfo(item,next),missing=shortage(item,next);
       record.classList.toggle('low',status.className==='low');
-      const input=record.querySelector('[data-action="quick-input"]');
-      if(input)input.classList.toggle('pending',isPending);
+      const input=record.querySelector('[data-action="quick-input"]');if(input)input.classList.toggle('pending',isPending);
       const minus=record.querySelector('[data-action="quick-minus"]');if(minus)minus.disabled=next===0;
       const saveButton=record.querySelector('[data-action="quick-save"]');
       if(saveButton){saveButton.disabled=!isPending;saveButton.textContent=!isPending?'Save':next<item.onSiteQty?'Save Sale':'Save Count'}
-      const chip=record.querySelector('.status-chip');
-      if(chip){chip.className=`status-chip ${status.className}`;chip.textContent=status.text}
-      const missingNode=record.querySelector('.restock-number');
-      if(missingNode){missingNode.textContent=missing;missingNode.classList.toggle('needed',missing>0)}
+      const chip=record.querySelector('.status-chip');if(chip){chip.className=`status-chip ${status.className}`;chip.textContent=status.text}
+      const missingNode=record.querySelector('.restock-number');if(missingNode){missingNode.textContent=missing;missingNode.classList.toggle('needed',missing>0)}
       const buttonMarkup=restockButtonMarkup(item,isPending);
       const mobile=record.querySelector('.mobile-restock'),desktop=record.querySelector('.desktop-restock');
       if(mobile)mobile.innerHTML=buttonMarkup;if(desktop)desktop.innerHTML=buttonMarkup
     }
-    function filterMatches(item){
-      const need=shortage(item)>0;
-      if(state.filter==='restock')return need;
-      if(state.filter==='full')return !need;
-      return true
-    }
+    function filterMatches(item){const need=shortage(item)>0;if(state.filter==='restock')return need;if(state.filter==='full')return !need;return true}
     function visibleItems(){
       const query=normalizeSearch(state.searchQuery);
       return state.items.map(item=>({item,score:fuzzyScore(item,query)}))
@@ -536,217 +621,131 @@
         .map(result=>result.item)
     }
     function totals(){
-      const target=state.items.reduce((sum,item)=>sum+item.targetQty,0);
-      const onSite=state.items.reduce((sum,item)=>sum+item.onSiteQty,0);
-      const toRestock=state.items.reduce((sum,item)=>sum+shortage(item),0);
-      const low=state.items.filter(item=>shortage(item)>0).length;
-      const full=state.items.length-low;
-      return{target,onSite,toRestock,low,full}
+      const target=state.items.reduce((sum,item)=>sum+item.targetQty,0),onSite=state.items.reduce((sum,item)=>sum+item.onSiteQty,0);
+      const toRestock=state.items.reduce((sum,item)=>sum+shortage(item),0),low=state.items.filter(item=>shortage(item)>0).length;
+      return{target,onSite,toRestock,low,full:state.items.length-low}
     }
-    function notify(message){
-      els.toast.textContent=message;els.toast.classList.add('show');clearTimeout(toastTimer);
-      toastTimer=setTimeout(()=>els.toast.classList.remove('show'),2000)
-    }
+    function notify(message){els.toast.textContent=message;els.toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>els.toast.classList.remove('show'),2400)}
     function photoMarkup(photo,name,className){return photo?`<img class="${className}" src="${photo}" alt="${esc(name)}">`:`<div class="${className} empty" aria-label="No photo available">No photo</div>`}
-    function statusInfo(item,onSite=item.onSiteQty){
-      const missing=shortage(item,onSite);
-      if(missing>0)return{className:'low',text:`Needs ${missing}`};
-      if(onSite>item.targetQty)return{className:'over',text:`Over by ${onSite-item.targetQty}`};
-      return{className:'full',text:'Fully stocked'}
-    }
-    function setFilter(filter){
-      state.filter=filter;
-      document.querySelectorAll('[data-filter]').forEach(button=>button.classList.toggle('active',button.dataset.filter===filter));
-      state.expandedId=null;state.editPhotoTemp=undefined;render()
-    }
+    function statusInfo(item,onSite=item.onSiteQty){const missing=shortage(item,onSite);if(missing>0)return{className:'low',text:`Needs ${missing}`};if(onSite>item.targetQty)return{className:'over',text:`Over by ${onSite-item.targetQty}`};return{className:'full',text:'Fully stocked'}}
+    function setFilter(filter){state.filter=filter;document.querySelectorAll('[data-filter]').forEach(button=>button.classList.toggle('active',button.dataset.filter===filter));closeEditTemp();state.expandedId=null;render()}
 
     function render(){
       const stats=totals(),percent=stats.target?Math.round(stats.onSite/stats.target*100):0;
       els.summary.textContent=stats.low?`${stats.low} item type${stats.low===1?'':'s'} need ${stats.toRestock} unit${stats.toRestock===1?'':'s'} replenished`:'Everything is fully stocked';
       els.metricRestock.textContent=stats.toRestock;
       els.metricRestockDetail.textContent=stats.toRestock?`${stats.toRestock} unit${stats.toRestock===1?'':'s'} needed across ${stats.low} item type${stats.low===1?'':'s'}`:'No units currently missing';
-      els.metricLow.textContent=stats.low;
-      els.metricLowDetail.textContent=stats.low?`${stats.full} item type${stats.full===1?' is':'s are'} at or above full stock`:'All item types are full';
-      els.metricStock.textContent=`${stats.onSite} / ${stats.target}`;
-      els.metricStockDetail.textContent=`${percent}% of expected floor stock`;
-      els.filterRestockCount.textContent=stats.low;els.filterAllCount.textContent=state.items.length;els.filterFullCount.textContent=stats.full;
-      els.clearSearch.hidden=!state.searchQuery;
-      if(!state.items.length){
-        els.items.innerHTML='<div class="empty-state"><strong>No floor items yet</strong>Add the expected full stock for each item. Sales will reduce the on-site count and create the restock queue.</div>';return
-      }
+      els.metricLow.textContent=stats.low;els.metricLowDetail.textContent=stats.low?`${stats.full} item type${stats.full===1?' is':'s are'} at or above full stock`:'All item types are full';
+      els.metricStock.textContent=`${stats.onSite} / ${stats.target}`;els.metricStockDetail.textContent=`${percent}% of expected floor stock`;
+      els.filterRestockCount.textContent=stats.low;els.filterAllCount.textContent=state.items.length;els.filterFullCount.textContent=stats.full;els.clearSearch.hidden=!state.searchQuery;
+      if(!state.ready){els.items.innerHTML='<div class="empty-state"><strong>Opening local database…</strong>Your inventory and automatic history are loading.</div>';return}
+      if(!state.items.length){els.items.innerHTML='<div class="empty-state"><strong>No floor items yet</strong>Add the expected full stock for each item. Sales will reduce the on-site count and create the restock queue.</div>';return}
       const visible=visibleItems();
       if(!visible.length){
-        if(state.filter==='restock'&&!state.searchQuery){
-          els.items.innerHTML='<div class="empty-state"><strong>Everything is fully stocked</strong>No replenishment is currently required.<br><button class="btn soft" type="button" data-global-action="view-all">View all items</button></div>'
-        }else{
-          els.items.innerHTML='<div class="empty-state"><strong>No matching items</strong>Try another search or filter.</div>'
-        }
+        if(state.filter==='restock'&&!state.searchQuery)els.items.innerHTML='<div class="empty-state"><strong>Everything is fully stocked</strong>No replenishment is currently required.<br><button class="btn soft" type="button" data-global-action="view-all">View all items</button></div>';
+        else els.items.innerHTML='<div class="empty-state"><strong>No matching items</strong>Try another search or filter.</div>';
         return
       }
       els.items.innerHTML=visible.map(renderItem).join('')
     }
-
     function renderItem(item){
       const expanded=state.expandedId===item.id;
-      const stagedPhoto=expanded&&state.editPhotoTemp!==undefined?state.editPhotoTemp:item.photo;
-      const stagedOnSite=pendingValue(item),isPending=stagedOnSite!==item.onSiteQty;
-      const stagedMissing=shortage(item,stagedOnSite),savedMissing=shortage(item);
-      const status=statusInfo(item,stagedOnSite);
-      const saveLabel=!isPending?'Save':stagedOnSite<item.onSiteQty?'Save Sale':'Save Count';
-      const restockButton=restockButtonMarkup(item,isPending);
+      const stagedPhoto=expanded&&state.editPhotoTemp!==undefined?(state.editPhotoTemp&&state.editPhotoTemp.url||''):item.photo;
+      const stagedOnSite=pendingValue(item),isPending=stagedOnSite!==item.onSiteQty,stagedMissing=shortage(item,stagedOnSite);
+      const status=statusInfo(item,stagedOnSite),saveLabel=!isPending?'Save':stagedOnSite<item.onSiteQty?'Save Sale':'Save Count',restockButton=restockButtonMarkup(item,isPending);
       return `<article class="item-record ${status.className==='low'?'low':''}${expanded?' expanded':''}" data-id="${item.id}">
         <div class="inventory-row" role="button" tabindex="0" aria-expanded="${expanded}">
           ${photoMarkup(item.photo,item.name,'thumb')}
-          <div class="item-name">
-            <strong>${esc(item.name)}</strong>
-            <div class="status-line"><span class="status-chip ${status.className}">${status.text}</span><span class="updated-small">Updated ${formatDate(item.updatedAt)}</span></div>
-          </div>
+          <div class="item-name"><strong>${esc(item.name)}</strong><div class="status-line"><span class="status-chip ${status.className}">${status.text}</span><span class="updated-small">Updated ${formatDate(item.updatedAt)}</span></div></div>
           <div class="quick-count" aria-label="Current on-site controls for ${esc(item.name)}">
             <button class="quick-btn" type="button" data-action="quick-minus" ${stagedOnSite===0?'disabled':''} aria-label="Record one sold ${esc(item.name)}">−</button>
             <input class="quick-input${isPending?' pending':''}" data-action="quick-input" type="number" min="0" max="999999" step="1" value="${stagedOnSite}" inputmode="numeric" aria-label="Current on-site quantity for ${esc(item.name)}">
             <button class="quick-btn" type="button" data-action="quick-plus" aria-label="Increase on-site count for ${esc(item.name)}">+</button>
             <button class="quick-save" type="button" data-action="quick-save" ${isPending?'':'disabled'}>${saveLabel}</button>
           </div>
-          <div class="number-cell desktop-target">${item.targetQty}</div>
-          <div class="target-mobile" hidden>Full stock ${item.targetQty}</div>
+          <div class="number-cell desktop-target">${item.targetQty}</div><div class="target-mobile" hidden>Full stock ${item.targetQty}</div>
           <div class="restock-cell"><span class="restock-number ${stagedMissing?'needed':''}">${stagedMissing}</span><span class="restock-label">units</span></div>
-          <div class="mobile-restock" hidden>${restockButton}</div>
-          <div class="desktop-restock">${restockButton}</div>
-          <details class="settings">
-            <summary class="icon-btn" aria-label="Settings for ${esc(item.name)}">•••</summary>
-            <div class="settings-menu">
-              <button class="menu-btn" type="button" data-action="edit">Edit item</button>
-              <button class="menu-btn delete" type="button" data-action="delete">Delete item</button>
-            </div>
-          </details>
+          <div class="mobile-restock" hidden>${restockButton}</div><div class="desktop-restock">${restockButton}</div>
+          <details class="settings"><summary class="icon-btn" aria-label="Settings for ${esc(item.name)}">•••</summary><div class="settings-menu"><button class="menu-btn" type="button" data-action="edit">Edit item</button><button class="menu-btn delete" type="button" data-action="delete">Delete item</button></div></details>
           <button class="icon-btn chevron" type="button" data-action="toggle" aria-label="${expanded?'Collapse':'Expand'} ${esc(item.name)}">⌄</button>
-        </div>
-        ${expanded?`<div class="item-details">${renderEditPanel(item,stagedPhoto,stagedOnSite)}</div>`:''}
+        </div>${expanded?`<div class="item-details">${renderEditPanel(item,stagedPhoto,stagedOnSite)}</div>`:''}
       </article>`
     }
-
     function renderEditPanel(item,photo,onSite){
       const missing=Math.max(0,item.targetQty-onSite);
       return `<form class="edit-panel" data-edit-form>
-        <div class="detail-photo">
-          ${photoMarkup(photo,item.name,'detail-preview')}
-          <div class="photo-actions">
-            <button class="btn soft small" type="button" data-action="edit-photo">Replace Photo</button>
-            <button class="btn soft small" type="button" data-action="remove-photo" ${photo?'':'disabled'}>Remove Photo</button>
-          </div>
-        </div>
+        <div class="detail-photo">${photoMarkup(photo,item.name,'detail-preview')}<div class="photo-actions"><button class="btn soft small" type="button" data-action="edit-photo">Replace Photo</button><button class="btn soft small" type="button" data-action="remove-photo" ${photo?'':'disabled'}>Remove Photo</button></div></div>
         <div class="edit-fields">
           <label>Item Name<input name="name" maxlength="60" value="${esc(item.name)}" required></label>
           <label>Full Stock<input name="targetQty" type="number" min="0" max="999999" step="1" value="${item.targetQty}" inputmode="numeric" required></label>
           <label>Current On-site<input name="onSiteQty" type="number" min="0" max="999999" step="1" value="${onSite}" inputmode="numeric" required></label>
-          <div class="stock-explainer">
-            <div><span>Expected on-site</span><strong data-detail-target>${item.targetQty}</strong></div>
-            <div><span>Currently on-site</span><strong data-detail-onsite>${onSite}</strong></div>
-            <div><span>Needs replenishment</span><strong data-detail-shortage>${missing}</strong></div>
-          </div>
-          <div class="date-info">
-            <div><strong>Date added</strong>${formatDateTime(item.createdAt)}</div>
-            <div><strong>Last updated</strong>${formatDateTime(item.updatedAt)}</div>
-            <div><strong>Last restocked</strong>${item.lastRestockedAt?formatDateTime(item.lastRestockedAt):'Not recorded'}</div>
-          </div>
-          <div class="form-actions">
-            <button class="btn soft" type="button" data-action="cancel-edit">Cancel</button>
-            <button class="btn primary">Save Changes</button>
-          </div>
+          <div class="stock-explainer"><div><span>Expected on-site</span><strong data-detail-target>${item.targetQty}</strong></div><div><span>Currently on-site</span><strong data-detail-onsite>${onSite}</strong></div><div><span>Needs replenishment</span><strong data-detail-shortage>${missing}</strong></div></div>
+          <div class="date-info"><div><strong>Date added</strong>${formatDateTime(item.createdAt)}</div><div><strong>Last updated</strong>${formatDateTime(item.updatedAt)}</div><div><strong>Last restocked</strong>${item.lastRestockedAt?formatDateTime(item.lastRestockedAt):'Not recorded'}</div></div>
+          <div class="form-actions"><button class="btn soft" type="button" data-action="cancel-edit">Cancel</button><button class="btn primary">Save Changes</button></div>
           ${renderHistory(item)}
-        </div>
-      </form>`
+        </div></form>`
     }
-
     function renderHistory(item){
       const logs=[...(item.logs||[])].sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));
-      return `<section class="history" aria-label="Stock history">
-        <div class="history-head"><h3>Stock Log</h3><span>${logs.length} snapshot${logs.length===1?'':'s'}</span></div>
-        ${logs.length?`<div class="history-list">${logs.map(log=>{
-          const beforeMissing=Math.max(0,log.before.targetQty-log.before.onSiteQty);
-          const afterMissing=Math.max(0,log.after.targetQty-log.after.onSiteQty);
-          return `<div class="log-entry">
-            <span class="log-action">${esc(log.action)}</span>
-            <span class="log-snapshot">On-site <strong>${log.before.onSiteQty} → ${log.after.onSiteQty}</strong> · Full <strong>${log.before.targetQty} → ${log.after.targetQty}</strong> · Restock <strong>${beforeMissing} → ${afterMissing}</strong></span>
-            <time class="log-time" datetime="${esc(log.at)}">${formatDateTime(log.at)}</time>
-          </div>`
-        }).join('')}</div>`:'<div class="history-empty">No saved stock snapshots yet.</div>'}
-      </section>`
+      return `<section class="history" aria-label="Stock history"><div class="history-head"><h3>Stock Log</h3><span>${logs.length} snapshot${logs.length===1?'':'s'}</span></div>
+        ${logs.length?`<div class="history-list">${logs.map(log=>{const beforeMissing=Math.max(0,log.before.targetQty-log.before.onSiteQty),afterMissing=Math.max(0,log.after.targetQty-log.after.onSiteQty);return `<div class="log-entry"><span class="log-action">${esc(log.action)}</span><span class="log-snapshot">On-site <strong>${log.before.onSiteQty} → ${log.after.onSiteQty}</strong> · Full <strong>${log.before.targetQty} → ${log.after.targetQty}</strong> · Restock <strong>${beforeMissing} → ${afterMissing}</strong></span><time class="log-time" datetime="${esc(log.at)}">${formatDateTime(log.at)}</time></div>`}).join('')}</div>`:'<div class="history-empty">No saved stock snapshots yet.</div>'}</section>`
     }
 
-    function commitSnapshot(item,next,action,{restocked=false}={}){
-      const previous={targetQty:item.targetQty,onSiteQty:item.onSiteQty,updatedAt:item.updatedAt,lastRestockedAt:item.lastRestockedAt,logs:[...(item.logs||[])]};
-      const before=snapshot(item),now=new Date().toISOString();
-      item.targetQty=next.targetQty;item.onSiteQty=next.onSiteQty;item.updatedAt=now;
-      if(restocked)item.lastRestockedAt=now;
-      item.logs=[...previous.logs,makeLog(action,before,snapshot(item),now)];
-      if(!save()){
-        item.targetQty=previous.targetQty;item.onSiteQty=previous.onSiteQty;item.updatedAt=previous.updatedAt;item.lastRestockedAt=previous.lastRestockedAt;item.logs=previous.logs;return false
-      }
-      return true
+    async function commitSnapshot(item,next,action,{restocked=false}={}){
+      const now=new Date().toISOString(),before=snapshot(item);
+      const nextItem={...item,targetQty:next.targetQty,onSiteQty:next.onSiteQty,updatedAt:now,lastRestockedAt:restocked?now:item.lastRestockedAt,logs:[...(item.logs||[]),makeLog(action,before,next,now)]};
+      try{await putItem(nextItem);Object.assign(item,nextItem);return true}catch(error){storageFailure(error);return false}
     }
-
     function compress(file){
       return new Promise((resolve,reject)=>{
-        const reader=new FileReader();reader.onerror=reject;
+        const reader=new FileReader();reader.onerror=()=>reject(reader.error||new Error('Unable to read image'));
         reader.onload=()=>{
-          const image=new Image();image.onerror=reject;
+          const image=new Image();image.onerror=()=>reject(new Error('Unable to decode image'));
           image.onload=()=>{
-            const max=900,scale=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));
-            const width=Math.max(1,Math.round(image.naturalWidth*scale)),height=Math.max(1,Math.round(image.naturalHeight*scale));
-            const canvas=document.createElement('canvas'),context=canvas.getContext('2d',{alpha:false});
-            canvas.width=width;canvas.height=height;context.fillStyle='#fff';context.fillRect(0,0,width,height);context.imageSmoothingQuality='high';context.drawImage(image,0,0,width,height);
-            resolve(canvas.toDataURL('image/jpeg',.68))
+            const max=900,scale=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight)),width=Math.max(1,Math.round(image.naturalWidth*scale)),height=Math.max(1,Math.round(image.naturalHeight*scale));
+            const canvas=document.createElement('canvas'),context=canvas.getContext('2d',{alpha:false});canvas.width=width;canvas.height=height;
+            context.fillStyle='#fff';context.fillRect(0,0,width,height);context.imageSmoothingQuality='high';context.drawImage(image,0,0,width,height);
+            canvas.toBlob(blob=>{if(!blob)return reject(new Error('Unable to compress image'));resolve({blob,url:URL.createObjectURL(blob)})},'image/jpeg',.66)
           };
           image.src=reader.result
         };
         reader.readAsDataURL(file)
       })
     }
+    function disposePhoto(photo){if(photo&&photo.url)revokeUrl(photo.url)}
     function setAddPreview(){
-      els.addPreview.outerHTML=state.addPhoto?`<img id="addPreview" class="add-preview" src="${state.addPhoto}" alt="New item photo preview">`:'<div id="addPreview" class="add-preview empty">No photo selected</div>';
-      els.addPreview=$('#addPreview');els.removeAddPhoto.disabled=!state.addPhoto
+      const url=state.addPhoto&&state.addPhoto.url||'';
+      els.addPreview.outerHTML=url?`<img id="addPreview" class="add-preview" src="${url}" alt="New item photo preview">`:'<div id="addPreview" class="add-preview empty">No photo selected</div>';
+      els.addPreview=$('#addPreview');els.removeAddPhoto.disabled=!url
     }
-    function openAdd(photo=''){
-      state.addPhoto=photo;state.addOnSiteTouched=false;els.addForm.reset();els.addTarget.value='1';els.addOnSite.value='1';setAddPreview();els.addDialog.showModal();setTimeout(()=>els.addName.focus(),50)
+    function openAdd(photo=null){
+      disposePhoto(state.addPhoto);state.addPhoto=photo;state.addOnSiteTouched=false;els.addForm.reset();els.addTarget.value='1';els.addOnSite.value='1';setAddPreview();els.addDialog.showModal();setTimeout(()=>els.addName.focus(),50)
     }
     function renderBatchDrafts(){
-      els.batchCount.textContent=`${state.batchDrafts.length} photo${state.batchDrafts.length===1?'':'s'} selected`;
-      els.saveBatch.disabled=!state.batchDrafts.length||state.batchProcessing;
-      els.batchItems.innerHTML=state.batchDrafts.map((draft,index)=>`<div class="batch-row" data-batch-id="${draft.id}">
-        <img class="batch-photo" src="${draft.photo}" alt="Selected photo ${index+1}">
-        <label>Item Name<input data-batch-name maxlength="60" value="${esc(draft.name||'')}" placeholder="Optional" autocomplete="off"></label>
-        <label>Full Stock<input data-batch-target type="number" min="0" max="999999" step="1" value="${draft.targetQty}" inputmode="numeric" required></label>
-        <label>On-site<input data-batch-onsite type="number" min="0" max="999999" step="1" value="${draft.onSiteQty}" inputmode="numeric" required></label>
-        <button class="batch-remove" type="button" data-batch-remove aria-label="Remove selected photo ${index+1}">×</button>
-      </div>`).join('')
+      els.batchCount.textContent=`${state.batchDrafts.length} photo${state.batchDrafts.length===1?'':'s'} selected`;els.saveBatch.disabled=!state.batchDrafts.length||state.batchProcessing;
+      els.batchItems.innerHTML=state.batchDrafts.map((draft,index)=>`<div class="batch-row" data-batch-id="${draft.id}"><img class="batch-photo" src="${draft.photo.url}" alt="Selected photo ${index+1}"><label>Item Name<input data-batch-name maxlength="60" value="${esc(draft.name||'')}" placeholder="Optional" autocomplete="off"></label><label>Full Stock<input data-batch-target type="number" min="0" max="999999" step="1" value="${draft.targetQty}" inputmode="numeric" required></label><label>On-site<input data-batch-onsite type="number" min="0" max="999999" step="1" value="${draft.onSiteQty}" inputmode="numeric" required></label><button class="batch-remove" type="button" data-batch-remove aria-label="Remove selected photo ${index+1}">×</button></div>`).join('')
     }
     async function openBatch(files){
-      const imageFiles=Array.from(files||[]).filter(file=>file.type.startsWith('image/'));
-      if(!imageFiles.length){notify('Please select one or more image files.');return}
+      const imageFiles=Array.from(files||[]).filter(file=>file.type.startsWith('image/'));if(!imageFiles.length){notify('Please select one or more image files.');return}
       state.batchProcessing=true;els.batchAlbumAdd.disabled=true;const drafts=[];
-      try{
-        for(let index=0;index<imageFiles.length;index++){
-          notify(`Processing photo ${index+1} of ${imageFiles.length}…`);
-          try{drafts.push({id:makeId(),photo:await compress(imageFiles[index]),name:'',targetQty:1,onSiteQty:1})}catch{}
-        }
-      }finally{state.batchProcessing=false;els.batchAlbumAdd.disabled=false}
+      try{for(let index=0;index<imageFiles.length;index++){notify(`Processing photo ${index+1} of ${imageFiles.length}…`);try{drafts.push({id:makeId(),photo:await compress(imageFiles[index]),name:'',targetQty:1,onSiteQty:1,onSiteTouched:false})}catch{}}}
+      finally{state.batchProcessing=false;els.batchAlbumAdd.disabled=false}
       if(!drafts.length){notify('Unable to process the selected photos.');return}
-      state.batchDrafts=drafts;renderBatchDrafts();els.batchDialog.showModal()
+      state.batchDrafts.forEach(draft=>disposePhoto(draft.photo));state.batchDrafts=drafts;renderBatchDrafts();els.batchDialog.showModal()
     }
     async function processPhoto(file,mode){
-      if(!file)return;if(!file.type.startsWith('image/')){notify('Please select an image file.');return}
-      notify('Processing photo…');
+      if(!file)return;if(!file.type.startsWith('image/')){notify('Please select an image file.');return}notify('Processing photo…');
       try{
         const compressed=await compress(file);
         if(mode==='quick')openAdd(compressed);
-        if(mode==='add'){state.addPhoto=compressed;setAddPreview()}
-        if(mode==='edit'){state.editPhotoTemp=compressed;render()}
+        if(mode==='add'){disposePhoto(state.addPhoto);state.addPhoto=compressed;setAddPreview()}
+        if(mode==='edit'){if(state.editPhotoTemp&&state.editPhotoTemp.url)disposePhoto(state.editPhotoTemp);state.editPhotoTemp=compressed;render()}
       }catch{notify('Unable to read this photo.')}
     }
+    function closeEditTemp(){if(state.editPhotoTemp&&state.editPhotoTemp.url)disposePhoto(state.editPhotoTemp);state.editPhotoTemp=undefined}
     function toggleItem(id,forceOpen=false){
-      if(state.expandedId===id&&!forceOpen){state.expandedId=null;state.editPhotoTemp=undefined}
-      else{state.expandedId=id;state.editPhotoTemp=undefined}
+      if(state.expandedId===id&&!forceOpen){state.expandedId=null;closeEditTemp()}
+      else{closeEditTemp();state.expandedId=id}
       render()
     }
     function closeSettings(target){const details=target.closest('details');if(details)details.open=false}
@@ -756,53 +755,51 @@
     document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>setFilter(button.dataset.filter)));
     els.cameraAdd.addEventListener('click',()=>els.quickPhoto.click());
     els.batchAlbumAdd.addEventListener('click',()=>els.batchPhotoInput.click());
-    els.noPhotoAdd.addEventListener('click',()=>openAdd(''));
+    els.noPhotoAdd.addEventListener('click',()=>openAdd(null));
     els.quickPhoto.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'quick');event.target.value=''});
     els.batchPhotoInput.addEventListener('change',async event=>{await openBatch(event.target.files);event.target.value=''});
     els.addPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'add');event.target.value=''});
     els.editPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'edit');event.target.value=''});
     els.changeAddPhoto.addEventListener('click',()=>els.addPhotoInput.click());
-    els.removeAddPhoto.addEventListener('click',()=>{state.addPhoto='';setAddPreview()});
+    els.removeAddPhoto.addEventListener('click',()=>{disposePhoto(state.addPhoto);state.addPhoto=null;setAddPreview()});
     els.addTarget.addEventListener('input',()=>{if(!state.addOnSiteTouched)els.addOnSite.value=els.addTarget.value});
     els.addOnSite.addEventListener('input',()=>{state.addOnSiteTouched=true});
 
     els.batchItems.addEventListener('input',event=>{
-      const row=event.target.closest('[data-batch-id]');if(!row)return;
-      const draft=state.batchDrafts.find(value=>value.id===row.dataset.batchId);if(!draft)return;
+      const row=event.target.closest('[data-batch-id]');if(!row)return;const draft=state.batchDrafts.find(value=>value.id===row.dataset.batchId);if(!draft)return;
       if(event.target.matches('[data-batch-name]'))draft.name=event.target.value;
       if(event.target.matches('[data-batch-target]')){draft.targetQty=Number(event.target.value);if(!draft.onSiteTouched){draft.onSiteQty=draft.targetQty;row.querySelector('[data-batch-onsite]').value=event.target.value}}
       if(event.target.matches('[data-batch-onsite]')){draft.onSiteQty=Number(event.target.value);draft.onSiteTouched=true}
     });
     els.batchItems.addEventListener('click',event=>{
-      const remove=event.target.closest('[data-batch-remove]');if(!remove)return;
-      const row=remove.closest('[data-batch-id]');state.batchDrafts=state.batchDrafts.filter(draft=>draft.id!==row.dataset.batchId);renderBatchDrafts();if(!state.batchDrafts.length)els.batchDialog.close()
+      const remove=event.target.closest('[data-batch-remove]');if(!remove)return;const row=remove.closest('[data-batch-id]'),draft=state.batchDrafts.find(value=>value.id===row.dataset.batchId);if(draft)disposePhoto(draft.photo);
+      state.batchDrafts=state.batchDrafts.filter(value=>value.id!==row.dataset.batchId);renderBatchDrafts();if(!state.batchDrafts.length)els.batchDialog.close()
     });
-    els.batchForm.addEventListener('submit',event=>{
+    els.batchForm.addEventListener('submit',async event=>{
       event.preventDefault();const rows=Array.from(els.batchItems.querySelectorAll('[data-batch-id]'));if(!rows.length)return notify('No photos remain in this batch.');
       const now=Date.now(),created=[];
       for(let index=0;index<rows.length;index++){
         const row=rows[index],draft=state.batchDrafts.find(value=>value.id===row.dataset.batchId);if(!draft)continue;
-        const name=row.querySelector('[data-batch-name]').value.trim()||'Untitled Item';
-        const targetQty=Number(row.querySelector('[data-batch-target]').value),onSiteQty=Number(row.querySelector('[data-batch-onsite]').value);
+        const name=row.querySelector('[data-batch-name]').value.trim()||'Untitled Item',targetQty=Number(row.querySelector('[data-batch-target]').value),onSiteQty=Number(row.querySelector('[data-batch-onsite]').value);
         if(!Number.isInteger(targetQty)||targetQty<0||targetQty>999999){row.querySelector('[data-batch-target]').focus();return notify('Each full stock value must be a valid whole number.')}
         if(!Number.isInteger(onSiteQty)||onSiteQty<0||onSiteQty>999999){row.querySelector('[data-batch-onsite]').focus();return notify('Each on-site value must be a valid whole number.')}
-        const at=new Date(now+index).toISOString(),item={id:makeId(),name,photo:draft.photo,targetQty,onSiteQty,createdAt:at,updatedAt:at,lastRestockedAt:'',logs:[]};
+        const at=new Date(now+index).toISOString(),item={id:makeId(),name,targetQty,onSiteQty,createdAt:at,updatedAt:at,lastRestockedAt:'',photoBlob:draft.photo.blob,photo:draft.photo.url,logs:[]};
         item.logs=[makeLog('Item created by batch import',{targetQty:0,onSiteQty:0},snapshot(item),at)];created.push(item)
       }
-      if(!created.length)return notify('No items were created.');state.items.push(...created);
-      if(!save()){state.items.splice(state.items.length-created.length,created.length);return}
-      state.batchDrafts=[];els.batchDialog.close();render();notify(`${created.length} item${created.length===1?'':'s'} added.`)
+      if(!created.length)return notify('No items were created.');els.saveBatch.disabled=true;
+      try{await putItems(created);state.items.push(...created);state.batchDrafts=[];els.batchDialog.close();render();notify(`${created.length} item${created.length===1?'':'s'} added.`)}
+      catch(error){storageFailure(error);els.saveBatch.disabled=false}
     });
-    els.addForm.addEventListener('submit',event=>{
+    els.addForm.addEventListener('submit',async event=>{
       event.preventDefault();const name=els.addName.value.trim(),targetQty=Number(els.addTarget.value),onSiteQty=Number(els.addOnSite.value);
       if(!name){els.addName.focus();return notify('Please enter an item name.')}
       if(!Number.isInteger(targetQty)||targetQty<0||targetQty>999999)return notify('Please enter a valid full stock level.');
       if(!Number.isInteger(onSiteQty)||onSiteQty<0||onSiteQty>999999)return notify('Please enter a valid current on-site count.');
       if(!state.addPhoto&&!confirm('Save this item without a photo?'))return;
-      const now=new Date().toISOString(),item={id:makeId(),name,photo:state.addPhoto,targetQty,onSiteQty,createdAt:now,updatedAt:now,lastRestockedAt:'',logs:[]};
-      item.logs=[makeLog('Item created',{targetQty:0,onSiteQty:0},snapshot(item),now)];state.items.push(item);
-      if(!save()){state.items.pop();return}
-      els.addDialog.close();state.addPhoto='';render();notify('Item added.')
+      const now=new Date().toISOString(),item={id:makeId(),name,targetQty,onSiteQty,createdAt:now,updatedAt:now,lastRestockedAt:'',photoBlob:state.addPhoto&&state.addPhoto.blob||null,photo:state.addPhoto&&state.addPhoto.url||'',logs:[]};
+      item.logs=[makeLog('Item created',{targetQty:0,onSiteQty:0},snapshot(item),now)];els.saveAdd.disabled=true;
+      try{await putItem(item);state.items.push(item);state.addPhoto=null;els.addDialog.close();render();notify('Item added.')}
+      catch(error){storageFailure(error)}finally{els.saveAdd.disabled=false}
     });
 
     els.items.addEventListener('input',event=>{
@@ -813,98 +810,82 @@
       const form=event.target.closest('[data-edit-form]');
       if(form&&(event.target.name==='targetQty'||event.target.name==='onSiteQty')){
         const target=Number(form.elements.targetQty.value),onSite=Number(form.elements.onSiteQty.value);
-        if(Number.isInteger(target)&&target>=0&&Number.isInteger(onSite)&&onSite>=0){
-          form.querySelector('[data-detail-target]').textContent=target;
-          form.querySelector('[data-detail-onsite]').textContent=onSite;
-          form.querySelector('[data-detail-shortage]').textContent=Math.max(0,target-onSite)
-        }
+        if(Number.isInteger(target)&&target>=0&&Number.isInteger(onSite)&&onSite>=0){form.querySelector('[data-detail-target]').textContent=target;form.querySelector('[data-detail-onsite]').textContent=onSite;form.querySelector('[data-detail-shortage]').textContent=Math.max(0,target-onSite)}
       }
     });
     els.items.addEventListener('change',event=>{
-      if(event.target.dataset.action!=='quick-input')return;
-      const record=event.target.closest('.item-record'),item=state.items.find(value=>value.id===record.dataset.id),next=Number(event.target.value);
-      if(!item)return;
+      if(event.target.dataset.action!=='quick-input')return;const record=event.target.closest('.item-record'),item=state.items.find(value=>value.id===record.dataset.id),next=Number(event.target.value);if(!item)return;
       if(!Number.isInteger(next)||next<0||next>999999){event.target.value=pendingValue(item);notify('Enter a valid whole-number on-site count.')}
     });
-    els.items.addEventListener('click',event=>{
+    els.items.addEventListener('click',async event=>{
       const globalAction=event.target.closest('[data-global-action]');if(globalAction){if(globalAction.dataset.globalAction==='view-all')setFilter('all');return}
-      const actionButton=event.target.closest('[data-action]'),record=event.target.closest('.item-record');if(!record)return;
-      const id=record.dataset.id,item=state.items.find(value=>value.id===id);if(!item)return;
+      const actionButton=event.target.closest('[data-action]'),record=event.target.closest('.item-record');if(!record)return;const id=record.dataset.id,item=state.items.find(value=>value.id===id);if(!item)return;
       if(actionButton){
         const action=actionButton.dataset.action;
         if(action==='toggle'||action==='edit'){closeSettings(actionButton);toggleItem(id,action==='edit');return}
-        if(action==='quick-plus'||action==='quick-minus'){
-          const next=pendingValue(item)+(action==='quick-plus'?1:-1);if(next>=0)stageOnSite(item,next);return
-        }
+        if(action==='quick-plus'||action==='quick-minus'){const next=pendingValue(item)+(action==='quick-plus'?1:-1);if(next>=0)stageOnSite(item,next);return}
         if(action==='quick-save'){
-          const next=pendingValue(item);if(next===item.onSiteQty)return;
-          const old=item.onSiteQty,difference=next-old;
-          const label=difference<0?`Sales saved: ${Math.abs(difference)} sold`:`On-site count adjusted +${difference}`;
-          if(commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:next},label)){
-            delete state.pendingOnSite[id];render();notify(`Saved ${old} → ${next}.`)
-          }
-          return
+          const next=pendingValue(item);if(next===item.onSiteQty)return;const old=item.onSiteQty,difference=next-old,label=difference<0?`Sales saved: ${Math.abs(difference)} sold`:`On-site count adjusted +${difference}`;
+          actionButton.disabled=true;if(await commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:next},label)){delete state.pendingOnSite[id];render();notify(`Saved ${old} → ${next}.`)}else actionButton.disabled=false;return
         }
         if(action==='restock'){
-          const amount=shortage(item);if(amount<=0)return;
-          if(commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:item.targetQty},`Restocked +${amount}`,{restocked:true})){
-            delete state.pendingOnSite[id];render();notify(`${item.name} restocked by ${amount}.`)
-          }
-          return
+          const amount=shortage(item);if(amount<=0)return;actionButton.disabled=true;
+          if(await commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:item.targetQty},`Restocked +${amount}`,{restocked:true})){delete state.pendingOnSite[id];render();notify(`${item.name} restocked by ${amount}.`)}else actionButton.disabled=false;return
         }
-        if(action==='delete'){
-          closeSettings(actionButton);state.deleteId=id;els.deleteText.textContent=`“${item.name}” and its stock history will be permanently deleted.`;els.deleteDialog.showModal();return
-        }
+        if(action==='delete'){closeSettings(actionButton);state.deleteId=id;els.deleteText.textContent=`“${item.name}” and its stock history will be permanently deleted.`;els.deleteDialog.showModal();return}
         if(action==='edit-photo'){els.editPhotoInput.click();return}
-        if(action==='remove-photo'){state.editPhotoTemp=null;render();return}
-        if(action==='cancel-edit'){delete state.pendingOnSite[id];state.expandedId=null;state.editPhotoTemp=undefined;render();return}
+        if(action==='remove-photo'){if(state.editPhotoTemp&&state.editPhotoTemp.url)disposePhoto(state.editPhotoTemp);state.editPhotoTemp=null;render();return}
+        if(action==='cancel-edit'){delete state.pendingOnSite[id];state.expandedId=null;closeEditTemp();render();return}
       }
       if(event.target.closest('button,input,label,summary,details,.item-details'))return;toggleItem(id)
     });
-    els.items.addEventListener('keydown',event=>{
-      if((event.key==='Enter'||event.key===' ')&&event.target.classList.contains('inventory-row')){event.preventDefault();toggleItem(event.target.closest('.item-record').dataset.id)}
-    });
-    els.items.addEventListener('submit',event=>{
-      const form=event.target.closest('[data-edit-form]');if(!form)return;event.preventDefault();
-      const record=form.closest('.item-record'),item=state.items.find(value=>value.id===record.dataset.id);if(!item)return;
+    els.items.addEventListener('keydown',event=>{if((event.key==='Enter'||event.key===' ')&&event.target.classList.contains('inventory-row')){event.preventDefault();toggleItem(event.target.closest('.item-record').dataset.id)}});
+    els.items.addEventListener('submit',async event=>{
+      const form=event.target.closest('[data-edit-form]');if(!form)return;event.preventDefault();const record=form.closest('.item-record'),item=state.items.find(value=>value.id===record.dataset.id);if(!item)return;
       const name=form.elements.name.value.trim(),targetQty=Number(form.elements.targetQty.value),onSiteQty=Number(form.elements.onSiteQty.value);
       if(!name){form.elements.name.focus();return notify('Please enter an item name.')}
       if(!Number.isInteger(targetQty)||targetQty<0||targetQty>999999)return notify('Please enter a valid full stock level.');
       if(!Number.isInteger(onSiteQty)||onSiteQty<0||onSiteQty>999999)return notify('Please enter a valid current on-site count.');
-      const previous={name:item.name,photo:item.photo,targetQty:item.targetQty,onSiteQty:item.onSiteQty,updatedAt:item.updatedAt,lastRestockedAt:item.lastRestockedAt,logs:[...(item.logs||[])]};
-      const before=snapshot(item),now=new Date().toISOString();item.name=name;item.targetQty=targetQty;item.onSiteQty=onSiteQty;
-      if(state.editPhotoTemp!==undefined)item.photo=state.editPhotoTemp||'';
-      item.updatedAt=now;
-      let action='Item details saved';
-      if(onSiteQty<before.onSiteQty)action=`Sales snapshot saved: ${before.onSiteQty-onSiteQty} sold`;
-      else if(onSiteQty>before.onSiteQty)action=`On-site count adjusted +${onSiteQty-before.onSiteQty}`;
+      const before=snapshot(item),now=new Date().toISOString();let action='Item details saved';
+      if(onSiteQty<before.onSiteQty)action=`Sales snapshot saved: ${before.onSiteQty-onSiteQty} sold`;else if(onSiteQty>before.onSiteQty)action=`On-site count adjusted +${onSiteQty-before.onSiteQty}`;
       if(targetQty!==before.targetQty)action=onSiteQty!==before.onSiteQty?'Stock levels updated':'Full stock level changed';
-      item.logs=[...previous.logs,makeLog(action,before,snapshot(item),now)];
-      if(!save()){Object.assign(item,previous);return}
-      delete state.pendingOnSite[item.id];state.expandedId=null;state.editPhotoTemp=undefined;render();notify('Item updated.')
+      const nextPhotoBlob=state.editPhotoTemp===undefined?item.photoBlob:state.editPhotoTemp===null?null:state.editPhotoTemp.blob;
+      const nextPhoto=state.editPhotoTemp===undefined?item.photo:state.editPhotoTemp===null?'':state.editPhotoTemp.url;
+      const nextItem={...item,name,targetQty,onSiteQty,updatedAt:now,photoBlob:nextPhotoBlob,photo:nextPhoto,logs:[...(item.logs||[]),makeLog(action,before,{targetQty,onSiteQty},now)]};
+      const submit=form.querySelector('button[type="submit"],button.btn.primary');if(submit)submit.disabled=true;
+      try{
+        await putItem(nextItem);const oldPhoto=item.photo;Object.assign(item,nextItem);if(oldPhoto!==nextPhoto)revokeUrl(oldPhoto);
+        delete state.pendingOnSite[item.id];state.expandedId=null;state.editPhotoTemp=undefined;render();notify('Item updated.')
+      }catch(error){storageFailure(error);if(submit)submit.disabled=false}
     });
-    els.deleteForm.addEventListener('submit',event=>{
-      event.preventDefault();const index=state.items.findIndex(item=>item.id===state.deleteId);if(index<0)return;
-      const removed=state.items.splice(index,1)[0];if(!save()){state.items.splice(index,0,removed);return}
-      if(state.expandedId===removed.id){state.expandedId=null;state.editPhotoTemp=undefined}
-      delete state.pendingOnSite[removed.id];state.deleteId=null;els.deleteDialog.close();render();notify(`Deleted ${removed.name}.`)
+    els.deleteForm.addEventListener('submit',async event=>{
+      event.preventDefault();const index=state.items.findIndex(item=>item.id===state.deleteId);if(index<0)return;const removed=state.items[index],submit=els.deleteForm.querySelector('.danger');submit.disabled=true;
+      try{await removeStoredItem(removed.id);state.items.splice(index,1);revokeUrl(removed.photo);if(state.expandedId===removed.id){state.expandedId=null;closeEditTemp()}delete state.pendingOnSite[removed.id];state.deleteId=null;els.deleteDialog.close();render();notify(`Deleted ${removed.name}.`)}
+      catch(error){storageFailure(error)}finally{submit.disabled=false}
     });
-    document.addEventListener('click',event=>{
-      const dialogId=event.target.dataset.close;if(dialogId)document.getElementById(dialogId).close();
-      if(!event.target.closest('.settings'))document.querySelectorAll('.settings[open]').forEach(menu=>menu.open=false)
-    });
+    document.addEventListener('click',event=>{const dialogId=event.target.dataset.close;if(dialogId)document.getElementById(dialogId).close();if(!event.target.closest('.settings'))document.querySelectorAll('.settings[open]').forEach(menu=>menu.open=false)});
     [els.addDialog,els.batchDialog,els.deleteDialog].forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
-    els.addDialog.addEventListener('close',()=>{state.addPhoto=''});
-    els.batchDialog.addEventListener('close',()=>{state.batchDrafts=[];els.batchItems.innerHTML=''});
+    els.addDialog.addEventListener('close',()=>{disposePhoto(state.addPhoto);state.addPhoto=null});
+    els.batchDialog.addEventListener('close',()=>{state.batchDrafts.forEach(draft=>disposePhoto(draft.photo));state.batchDrafts=[];els.batchItems.innerHTML=''});
 
     ['gesturestart','gesturechange','gestureend'].forEach(type=>document.addEventListener(type,event=>event.preventDefault(),{passive:false}));
     document.addEventListener('touchmove',event=>{if(event.touches&&event.touches.length>1)event.preventDefault()},{passive:false});
-    let lastTouchEnd=0;
-    document.addEventListener('touchend',event=>{const now=Date.now();if(now-lastTouchEnd<=300)event.preventDefault();lastTouchEnd=now},{passive:false});
+    let lastTouchEnd=0;document.addEventListener('touchend',event=>{const now=Date.now();if(now-lastTouchEnd<=300)event.preventDefault();lastTouchEnd=now},{passive:false});
     document.addEventListener('wheel',event=>{if(event.ctrlKey||event.metaKey)event.preventDefault()},{passive:false});
     document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&['+','=','-','0'].includes(event.key))event.preventDefault()});
 
     render();
+    try{
+      db=await openDatabase();
+      state.items=await loadItems();
+      state.ready=true;
+      const persistent=await requestPersistentStorage();
+      if(els.storageNote)els.storageNote.textContent=persistent?'IndexedDB · persistent automatic history':'IndexedDB · automatic history';
+      render();
+      if(state.items.length)notify('Inventory and history loaded.');
+    }catch(error){
+      console.error(error);state.ready=true;render();notify('Unable to open the browser database. Try reopening the app.');
+    }
   })();
   </script>
 </body>
