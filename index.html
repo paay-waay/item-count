@@ -4,18 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#12bfd6">
-  <title>Inventory Counter</title>
+  <title>Floor Stock</title>
   <link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Inventory">
+  <meta name="apple-mobile-web-app-title" content="Floor Stock">
   <style>
     :root{
-      --ink:#171916;--muted:#73776e;--line:#dedfd9;--bg:#f4f4f1;--card:#fff;
-      --accent:#c9ef70;--danger:#a32d27;--shadow:0 14px 40px #1719161c;
+      --ink:#171916;--muted:#6f746b;--line:#dcddd7;--bg:#f4f4f1;--card:#fff;
+      --cyan:#12bfd6;--cyan-soft:#e5f9fc;--accent:#c9ef70;--accent-dark:#47651a;
+      --warn:#d66b2f;--warn-soft:#fff0e7;--danger:#a32d27;--danger-soft:#fbe8e6;
+      --shadow:0 14px 40px #1719161c;
       font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)
     }
     *{box-sizing:border-box}
@@ -23,49 +25,76 @@
     body{margin:0;background:var(--bg);overscroll-behavior:none}
     button,input{font:inherit}
     button{cursor:pointer}
-    button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #c9ef7088;outline-offset:2px}
-    .shell{width:min(100% - 24px,1040px);margin:auto;padding:28px 0 150px}
-    .page-header{display:flex;justify-content:space-between;align-items:end;gap:16px;margin:0 2px 18px}
+    button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #12bfd655;outline-offset:2px}
+    .shell{width:min(100% - 24px,1080px);margin:auto;padding:26px 0 154px}
+    .page-header{display:flex;justify-content:space-between;align-items:end;gap:16px;margin:0 2px 16px}
     .header-copy{min-width:0}
-    h1{margin:0;font-size:clamp(28px,4vw,39px);letter-spacing:-.05em}
+    h1{margin:0;font-size:clamp(28px,4vw,40px);letter-spacing:-.05em}
     .summary,.note{margin:6px 0 0;color:var(--muted);font-size:13px}
     .desktop-note{margin:0 0 4px;text-align:right}
 
-    .search-wrap{position:relative;margin:0 0 12px}
+    .dashboard{display:grid;grid-template-columns:1.15fr .85fr .85fr;gap:10px;margin-bottom:12px}
+    .metric{min-height:105px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--card)}
+    .metric.primary-metric{background:var(--warn-soft);border-color:#efc9b2}
+    .metric-label{display:block;color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+    .metric-value{display:block;margin-top:8px;font-size:31px;font-weight:820;letter-spacing:-.05em;font-variant-numeric:tabular-nums}
+    .metric.primary-metric .metric-value{color:#99461c}
+    .metric-detail{display:block;margin-top:5px;color:var(--muted);font-size:12px;line-height:1.35}
+
+    .toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin-bottom:12px}
+    .search-wrap{position:relative}
     .search-wrap::before{content:'⌕';position:absolute;left:15px;top:50%;z-index:1;transform:translateY(-52%);color:var(--muted);font-size:23px;line-height:1;pointer-events:none}
     .search-input{min-height:50px;padding:0 48px 0 46px;border-radius:14px;background:var(--card);box-shadow:0 1px 0 #17191605}
     .search-input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
     .search-clear{position:absolute;right:8px;top:50%;display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:9px;transform:translateY(-50%);background:transparent;color:var(--muted);font-size:21px;line-height:1}
     .search-clear:hover{background:#ecece8;color:var(--ink)}
     .search-clear[hidden]{display:none}
+    .filters{display:flex;align-items:center;gap:5px;padding:5px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+    .filter-btn{min-height:38px;padding:0 12px;border:0;border-radius:10px;background:transparent;color:var(--muted);font-size:12px;font-weight:760;white-space:nowrap}
+    .filter-btn.active{background:var(--ink);color:#fff}
+    .filter-count{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:4px;padding:0 5px;border-radius:99px;background:#ecece8;color:var(--ink);font-size:10px}
+    .filter-btn.active .filter-count{background:#ffffff22;color:#fff}
     .visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 
     .inventory{border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:visible}
-    .list-head,.inventory-row{
-      display:grid;grid-template-columns:58px minmax(180px,1fr) 218px 124px 124px 42px 42px;
-      gap:12px;align-items:center
-    }
-    .list-head{padding:11px 14px;color:var(--muted);font-size:11px;font-weight:750;letter-spacing:.055em;text-transform:uppercase;border-bottom:1px solid var(--line)}
-    .list-head span:nth-child(3){text-align:center}
+    .list-head,.inventory-row{display:grid;grid-template-columns:58px minmax(170px,1fr) 236px 92px 112px 126px 42px 42px;gap:10px;align-items:center}
+    .list-head{padding:11px 14px;color:var(--muted);font-size:10px;font-weight:800;letter-spacing:.055em;text-transform:uppercase;border-bottom:1px solid var(--line)}
+    .list-head span:nth-child(n+3):nth-child(-n+6){text-align:center}
     .item-record{position:relative;border-bottom:1px solid var(--line)}
     .item-record:last-child{border-bottom:0}
-    .inventory-row{min-height:78px;padding:10px 14px;cursor:pointer;transition:background .15s}
+    .inventory-row{min-height:82px;padding:11px 14px;cursor:pointer;transition:background .15s}
     .inventory-row:hover{background:#fafaf7}
     .item-record.expanded>.inventory-row{background:#f8f8f4}
+    .item-record.low>.inventory-row{box-shadow:inset 4px 0 0 var(--warn)}
     .thumb{width:54px;height:54px;border:1px solid var(--line);border-radius:11px;object-fit:cover;background:#ebece6}
     .thumb.empty{display:grid;place-items:center;padding:5px;color:var(--muted);font-size:9px;font-weight:700;text-align:center;line-height:1.2}
     .item-name{min-width:0}
     .item-name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
-    .mobile-meta{display:none;margin-top:4px;color:var(--muted);font-size:11px;line-height:1.4}
-    .quick-count{display:grid;grid-template-columns:40px minmax(48px,1fr) 40px 58px;gap:6px;align-items:center}
-    .quick-btn{display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid var(--line);border-radius:10px;background:#f5f5f2;color:var(--ink);font-size:22px;line-height:1}
+    .status-line{display:flex;align-items:center;gap:6px;margin-top:5px;min-width:0}
+    .status-chip{display:inline-flex;align-items:center;min-height:22px;padding:0 7px;border-radius:99px;font-size:10px;font-weight:800;white-space:nowrap}
+    .status-chip.low{background:var(--warn-soft);color:#99461c}
+    .status-chip.full{background:#edf7dc;color:var(--accent-dark)}
+    .status-chip.over{background:var(--cyan-soft);color:#087688}
+    .updated-small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:10px}
+
+    .quick-count{display:grid;grid-template-columns:38px minmax(58px,1fr) 38px 82px;gap:5px;align-items:center}
+    .quick-btn{display:grid;place-items:center;width:38px;height:40px;padding:0;border:1px solid var(--line);border-radius:10px;background:#f5f5f2;color:var(--ink);font-size:21px;line-height:1}
     .quick-btn:hover{background:#ecece8}
-    .quick-btn:disabled{opacity:.4;cursor:not-allowed}
-    .quick-value{text-align:center;font-size:21px;font-weight:780;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
-    .quick-value.pending{color:#52721d}
-    .quick-save{height:40px;padding:0 9px;border:0;border-radius:10px;background:var(--accent);color:var(--ink);font-size:11px;font-weight:800}
-    .quick-save:disabled{background:#ecece8;color:var(--muted);opacity:.65;cursor:not-allowed}
-    .date{color:var(--muted);font-size:12px;line-height:1.35}
+    .quick-btn:disabled{opacity:.38;cursor:not-allowed}
+    .quick-input{min-width:0;height:40px;min-height:40px;padding:0 7px;text-align:center;font-size:19px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+    .quick-input.pending{border-color:#93b849;background:#f7fce9;color:#47651a}
+    .quick-save{height:40px;padding:0 8px;border:0;border-radius:10px;background:var(--accent);color:var(--ink);font-size:10px;font-weight:850;line-height:1.1}
+    .quick-save:disabled{background:#ecece8;color:var(--muted);opacity:.7;cursor:not-allowed}
+    .number-cell{text-align:center;font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+    .restock-cell{text-align:center}
+    .restock-number{display:block;font-size:21px;font-weight:850;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+    .restock-number.needed{color:#a74d20}
+    .restock-label{display:block;margin-top:2px;color:var(--muted);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    .restock-btn{min-height:42px;width:100%;padding:0 10px;border:0;border-radius:11px;background:var(--warn);color:#fff;font-size:11px;font-weight:850;line-height:1.15}
+    .restock-btn:hover{filter:brightness(.96)}
+    .restock-btn.full{background:#edf7dc;color:var(--accent-dark);cursor:default}
+    .restock-btn.over{background:var(--cyan-soft);color:#087688;cursor:default}
+    .restock-btn.waiting{background:#ecece8;color:var(--muted);cursor:not-allowed}
     .icon-btn{display:grid;place-items:center;width:38px;height:38px;padding:0;border:0;border-radius:10px;background:transparent;color:var(--muted)}
     .icon-btn:hover{background:#ecece8;color:var(--ink)}
     .chevron{font-size:18px;transition:transform .18s}
@@ -74,46 +103,49 @@
     .settings{position:relative}
     .settings summary{list-style:none}
     .settings summary::-webkit-details-marker{display:none}
-    .settings-menu{position:absolute;top:42px;right:0;z-index:6;width:150px;padding:6px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:var(--shadow)}
+    .settings-menu{position:absolute;top:42px;right:0;z-index:6;width:158px;padding:6px;border:1px solid var(--line);border-radius:12px;background:#fff;box-shadow:var(--shadow)}
     .menu-btn{width:100%;min-height:40px;padding:0 11px;border:0;border-radius:8px;background:transparent;text-align:left;font-size:13px;font-weight:650}
     .menu-btn:hover{background:#f2f2ee}
     .menu-btn.delete{color:var(--danger)}
 
     .item-details{padding:0 14px 16px;background:#f8f8f4}
-    .edit-panel{display:grid;grid-template-columns:180px minmax(0,1fr);gap:18px;padding:18px;border:1px solid var(--line);border-radius:15px;background:#fff}
+    .edit-panel{display:grid;grid-template-columns:190px minmax(0,1fr);gap:18px;padding:18px;border:1px solid var(--line);border-radius:15px;background:#fff}
     .detail-photo{display:grid;align-content:start;gap:9px}
     .detail-preview{width:100%;aspect-ratio:4/3;border:1px solid var(--line);border-radius:13px;object-fit:cover;background:#ebebe6}
     .detail-preview.empty{display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center}
     .photo-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-    .edit-fields{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:13px;align-content:start}
+    .edit-fields{display:grid;grid-template-columns:minmax(0,1fr) 150px 150px;gap:13px;align-content:start}
     label{display:grid;gap:7px;color:var(--muted);font-size:12px;font-weight:680}
     input{width:100%;min-height:45px;padding:0 13px;border:1px solid var(--line);border-radius:11px;background:#fff;outline:0;color:var(--ink);font-size:16px}
-    input:focus{border-color:#778b43;box-shadow:0 0 0 3px #c9ef7055}
-    .date-info{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;border-radius:11px;background:#f4f4f1;color:var(--muted);font-size:12px;line-height:1.45}
+    input:focus{border-color:#4ba6b3;box-shadow:0 0 0 3px #12bfd62e}
+    .stock-explainer{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px;border-radius:12px;background:#f4f4f1}
+    .stock-explainer div{min-width:0}
+    .stock-explainer span{display:block;color:var(--muted);font-size:10px;font-weight:760;text-transform:uppercase;letter-spacing:.05em}
+    .stock-explainer strong{display:block;margin-top:4px;font-size:18px;font-variant-numeric:tabular-nums}
+    .date-info{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;padding:12px;border-radius:11px;background:#f4f4f1;color:var(--muted);font-size:12px;line-height:1.45}
     .date-info strong{display:block;color:var(--ink);font-size:12px}
     .form-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:9px;margin-top:3px}
     .history{grid-column:1/-1;margin-top:5px;border-top:1px solid var(--line);padding-top:15px}
     .history-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:9px}
     .history-head h3{margin:0;font-size:14px}
     .history-head span{color:var(--muted);font-size:11px}
-    .history-list{display:grid;gap:7px;max-height:260px;overflow:auto;padding-right:3px}
-    .log-entry{display:grid;grid-template-columns:minmax(100px,auto) 60px minmax(110px,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#f8f8f4;font-size:12px}
-    .log-change{font-weight:760;font-variant-numeric:tabular-nums}
-    .log-delta{font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
-    .log-delta.positive{color:#52721d}
-    .log-delta.negative{color:var(--danger)}
-    .log-action,.log-time{color:var(--muted)}
-    .log-time{text-align:right;white-space:nowrap;font-size:11px}
+    .history-list{display:grid;gap:7px;max-height:290px;overflow:auto;padding-right:3px}
+    .log-entry{display:grid;grid-template-columns:minmax(135px,1fr) minmax(175px,1.35fr) auto;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:10px;background:#f8f8f4;font-size:12px}
+    .log-action{font-weight:760}
+    .log-snapshot{color:var(--muted);font-variant-numeric:tabular-nums;line-height:1.4}
+    .log-snapshot strong{color:var(--ink)}
+    .log-time{text-align:right;white-space:nowrap;color:var(--muted);font-size:11px}
     .history-empty{padding:14px;border:1px dashed var(--line);border-radius:10px;color:var(--muted);font-size:12px;text-align:center}
 
-    .empty-state{padding:70px 20px;color:var(--muted);text-align:center}
+    .empty-state{padding:66px 20px;color:var(--muted);text-align:center}
     .empty-state strong{display:block;margin-bottom:7px;color:var(--ink);font-size:17px}
+    .empty-state .btn{margin-top:14px}
 
     .btn{min-height:44px;padding:0 15px;border:0;border-radius:11px;font-weight:740}
     .btn.small{min-height:38px;padding:0 10px;font-size:12px}
     .primary{background:var(--ink);color:#fff}
     .soft{background:#ecece8;color:var(--ink)}
-    .danger{background:#fbe8e6;color:var(--danger)}
+    .danger{background:var(--danger-soft);color:var(--danger)}
     .btn:disabled{opacity:.5;cursor:not-allowed}
     .file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 
@@ -124,67 +156,106 @@
     .fab-link{padding:6px 10px;border:0;border-radius:99px;background:#f4f4f1e8;color:var(--ink);font-size:11px;font-weight:720;box-shadow:0 4px 16px #17191614;backdrop-filter:blur(8px)}
     .fab-link:disabled{opacity:.55;cursor:not-allowed}
 
-    .batch-dialog{width:min(94vw,760px)}
+    .batch-dialog{width:min(94vw,820px)}
     .batch-status{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 12px;color:var(--muted);font-size:12px}
     .batch-list{display:grid;gap:9px;max-height:min(58vh,520px);overflow:auto;padding:1px 4px 1px 1px}
-    .batch-row{display:grid;grid-template-columns:92px minmax(0,1fr) 110px 36px;gap:10px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:13px;background:#f8f8f4}
+    .batch-row{display:grid;grid-template-columns:92px minmax(0,1fr) 104px 104px 36px;gap:10px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:13px;background:#f8f8f4}
     .batch-photo{width:92px;height:72px;border:1px solid var(--line);border-radius:10px;object-fit:cover;background:#ebebe6}
     .batch-remove{display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:20px}
-    .batch-remove:hover{background:#fbe8e6;color:var(--danger)}
+    .batch-remove:hover{background:var(--danger-soft);color:var(--danger)}
 
-    dialog{width:min(92vw,430px);padding:0;border:0;border-radius:18px;box-shadow:0 24px 80px #0003}
+    dialog{width:min(92vw,470px);padding:0;border:0;border-radius:18px;box-shadow:0 24px 80px #0003}
     dialog::backdrop{background:#17191688;backdrop-filter:blur(2px)}
     .modal{padding:22px}
     .modal h2{margin:0 0 7px;font-size:23px;letter-spacing:-.025em}
     .modal>p{margin:0 0 17px;color:var(--muted);font-size:13px;line-height:1.5}
     .add-preview{width:100%;aspect-ratio:16/8;border:1px solid var(--line);border-radius:13px;object-fit:cover;background:#ebebe6;margin-bottom:13px}
     .add-preview.empty{display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center}
-    .modal-grid{display:grid;grid-template-columns:minmax(0,1fr) 130px;gap:12px}
+    .modal-grid{display:grid;grid-template-columns:minmax(0,1fr) 130px 130px;gap:12px}
+    .modal-grid label:first-child{grid-column:1/-1}
     .modal-photo-actions{display:flex;gap:8px;margin:0 0 14px}
     .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:17px}
     .toast{position:fixed;left:50%;bottom:calc(116px + env(safe-area-inset-bottom));z-index:12;transform:translate(-50%,15px);padding:10px 15px;border-radius:99px;background:var(--ink);color:#fff;font-size:13px;opacity:0;pointer-events:none;transition:.2s;box-shadow:var(--shadow)}
     .toast.show{opacity:1;transform:translate(-50%,0)}
 
+    @media(max-width:900px){
+      .list-head,.inventory-row{grid-template-columns:56px minmax(145px,1fr) 214px 78px 94px 112px 38px 38px;gap:7px}
+      .quick-count{grid-template-columns:34px minmax(50px,1fr) 34px 74px}
+      .quick-btn{width:34px}
+      .edit-fields{grid-template-columns:minmax(0,1fr) 140px 140px}
+    }
     @media(max-width:760px){
-      .shell{width:calc(100% - 20px);padding-top:19px}
+      .shell{width:calc(100% - 20px);padding-top:18px}
       .desktop-note{display:none}
+      .dashboard{grid-template-columns:1.15fr .85fr}
+      .metric:last-child{grid-column:1/-1;min-height:82px}
+      .toolbar{grid-template-columns:1fr}
+      .filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;overflow:visible}
+      .filter-btn{min-width:0;padding:0 5px;font-size:10px}
+      .filter-count{min-width:18px;height:18px;margin-left:2px;padding:0 4px;font-size:9px}
       .list-head{display:none}
-      .inventory-row{grid-template-columns:56px minmax(0,1fr) 180px 38px 38px;gap:9px;padding:10px}
-      .inventory-row>.date{display:none}
-      .mobile-meta{display:block}
-      .quick-count{grid-template-columns:36px minmax(42px,1fr) 36px 54px;gap:4px}
-      .quick-btn{width:36px;height:36px}
-      .quick-value{font-size:19px}
-      .quick-save{height:36px;padding:0 7px;font-size:10px}
+      .inventory-row{grid-template-columns:54px minmax(0,1fr) 36px 36px;grid-template-areas:"photo name menu expand" "count count count count" "target target restock restock";gap:8px 8px;padding:12px 10px}
+      .thumb{grid-area:photo}
+      .item-name{grid-area:name;align-self:center}
+      .item-name strong{white-space:normal;line-height:1.2}
+      .quick-count{grid-area:count;grid-template-columns:36px minmax(56px,1fr) 36px 74px}
+      .quick-btn{width:36px;height:38px}
+      .quick-input{height:38px;min-height:38px;font-size:18px;padding:0 6px}
+      .quick-save{height:38px;padding:0 7px;font-size:9px}
+      .target-mobile{grid-area:target;display:flex!important;align-items:center;color:var(--muted);font-size:11px}
+      .desktop-target,.restock-cell,.desktop-restock{display:none}
+      .mobile-restock{grid-area:restock;display:block!important}
+      .mobile-restock .restock-btn{min-height:40px}
+      .settings{grid-area:menu}
+      .chevron{grid-area:expand}
       .edit-panel{grid-template-columns:1fr;padding:14px}
       .detail-photo{grid-template-columns:120px 1fr;align-items:start}
       .detail-preview{width:120px}
       .photo-actions{grid-template-columns:1fr;align-self:center}
+      .edit-fields{grid-template-columns:1fr 1fr}
+      .edit-fields label:first-child{grid-column:1/-1}
+      .stock-explainer{grid-template-columns:repeat(3,1fr)}
+      .date-info{grid-template-columns:1fr 1fr}
+      .date-info>div:last-child{grid-column:1/-1}
     }
+    @media(min-width:761px){.target-mobile,.mobile-restock{display:none}}
     @media(max-width:520px){
       h1{font-size:30px}
-      .inventory-row{grid-template-columns:50px minmax(0,1fr) 154px 34px 34px;gap:7px}
+      .dashboard{grid-template-columns:1fr 1fr;gap:8px}
+      .metric{min-height:94px;padding:13px}
+      .metric-value{font-size:27px}
+      .inventory-row{grid-template-columns:48px minmax(0,1fr) 32px 32px;gap:7px 7px}
       .thumb{width:48px;height:48px}
-      .icon-btn{width:34px;height:34px}
-      .quick-count{grid-template-columns:30px minmax(34px,1fr) 30px 48px}
-      .quick-btn{width:30px;height:32px;font-size:19px}
-      .quick-save{height:32px;padding:0 5px;font-size:9px}
-      .quick-value{font-size:17px}
       .item-name strong{font-size:14px}
-      .edit-fields,.modal-grid{grid-template-columns:1fr}
+      .status-chip{font-size:9px;padding:0 6px}
+      .updated-small{display:none}
+      .quick-count{grid-template-columns:32px minmax(48px,1fr) 32px 66px;gap:4px}
+      .quick-btn{width:32px;height:35px;font-size:18px}
+      .quick-input{height:35px;min-height:35px;font-size:16px}
+      .quick-save{height:35px;font-size:8px}
+      .restock-btn{min-height:38px;padding:0 8px;font-size:9px}
+      .icon-btn{width:32px;height:32px}
+      .edit-fields{grid-template-columns:1fr}
+      .edit-fields label:first-child{grid-column:auto}
+      .stock-explainer{grid-template-columns:1fr 1fr}
+      .stock-explainer div:last-child{grid-column:1/-1}
       .date-info{grid-template-columns:1fr}
+      .date-info>div:last-child{grid-column:auto}
       .form-actions{display:grid;grid-template-columns:1fr 1fr}
       .detail-photo{grid-template-columns:1fr}
       .detail-preview{width:100%}
       .photo-actions{grid-template-columns:1fr 1fr}
-      .log-entry{grid-template-columns:1fr auto;gap:5px 10px}
-      .log-action{grid-column:1}
-      .log-time{grid-column:2;grid-row:2}
+      .log-entry{grid-template-columns:1fr auto;gap:6px 10px}
+      .log-snapshot{grid-column:1/-1}
       .fab-secondary{max-width:calc(100vw - 20px)}
       .fab-link{font-size:10px;padding:6px 8px}
-      .batch-row{grid-template-columns:72px minmax(0,1fr) 88px 32px;gap:7px;padding:8px}
-      .batch-photo{width:72px;height:64px}
-      .batch-remove{width:32px;height:34px}
+      .batch-row{grid-template-columns:70px minmax(0,1fr) 72px 72px 30px;gap:6px;padding:8px}
+      .batch-photo{width:70px;height:64px}
+      .batch-remove{width:30px;height:34px}
+      .batch-row label{font-size:10px}
+      .batch-row input{padding:0 7px}
+      .modal-grid{grid-template-columns:1fr 1fr}
+      .modal-grid label:first-child{grid-column:1/-1}
     }
   </style>
 </head>
@@ -192,21 +263,46 @@
   <main class="shell">
     <header class="page-header" aria-labelledby="pageTitle">
       <div class="header-copy">
-        <h1 id="pageTitle">Inventory</h1>
-        <p class="summary" id="summary">0 item types · 0 total units</p>
+        <h1 id="pageTitle">Floor Stock</h1>
+        <p class="summary" id="summary">Nothing needs restocking</p>
       </div>
       <span class="note desktop-note">Stored in this browser</span>
     </header>
 
-    <div class="search-wrap" role="search">
-      <label class="visually-hidden" for="inventorySearch">Search inventory</label>
-      <input class="search-input" id="inventorySearch" type="search" placeholder="Search inventory" autocomplete="off" autocapitalize="none" spellcheck="false">
-      <button class="search-clear" id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
+    <section class="dashboard" aria-label="Stock summary">
+      <div class="metric primary-metric">
+        <span class="metric-label">To Restock</span>
+        <strong class="metric-value" id="metricRestock">0</strong>
+        <span class="metric-detail" id="metricRestockDetail">No units currently missing</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Items Low</span>
+        <strong class="metric-value" id="metricLow">0</strong>
+        <span class="metric-detail" id="metricLowDetail">All item types are full</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">On-site / Full</span>
+        <strong class="metric-value" id="metricStock">0 / 0</strong>
+        <span class="metric-detail" id="metricStockDetail">0% of expected floor stock</span>
+      </div>
+    </section>
+
+    <div class="toolbar">
+      <div class="search-wrap" role="search">
+        <label class="visually-hidden" for="inventorySearch">Search items</label>
+        <input class="search-input" id="inventorySearch" type="search" placeholder="Search items" autocomplete="off" autocapitalize="none" spellcheck="false">
+        <button class="search-clear" id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
+      </div>
+      <nav class="filters" aria-label="Inventory filters">
+        <button class="filter-btn active" type="button" data-filter="restock">Restock Needed <span class="filter-count" id="filterRestockCount">0</span></button>
+        <button class="filter-btn" type="button" data-filter="all">All Items <span class="filter-count" id="filterAllCount">0</span></button>
+        <button class="filter-btn" type="button" data-filter="full">Fully Stocked <span class="filter-count" id="filterFullCount">0</span></button>
+      </nav>
     </div>
 
-    <section class="inventory" aria-label="Inventory list">
+    <section class="inventory" aria-label="Floor stock list">
       <div class="list-head" aria-hidden="true">
-        <span>Photo</span><span>Item</span><span>Quantity</span><span>Date added</span><span>Last updated</span><span></span><span></span>
+        <span>Photo</span><span>Item</span><span>Current on-site</span><span>Full stock</span><span>To restock</span><span>Confirm</span><span></span><span></span>
       </div>
       <div id="items" aria-live="polite"></div>
     </section>
@@ -227,16 +323,17 @@
 
   <dialog id="addDialog">
     <form class="modal" id="addForm">
-      <h2>Add Item</h2>
-      <p>Photos are optional. Item name and quantity are required.</p>
+      <h2>Add Floor Item</h2>
+      <p>Full stock is how many should be on-site after replenishment. Current on-site is how many are there now.</p>
       <div id="addPreview" class="add-preview empty">No photo selected</div>
       <div class="modal-photo-actions">
         <button class="btn soft small" type="button" id="changeAddPhoto">Take / Choose Photo</button>
         <button class="btn soft small" type="button" id="removeAddPhoto">Remove Photo</button>
       </div>
       <div class="modal-grid">
-        <label>Item Name<input id="addName" maxlength="60" placeholder="e.g. White Mug" autocomplete="off" required></label>
-        <label>Starting Quantity<input id="addQuantity" type="number" min="0" max="999999" step="1" value="1" inputmode="numeric" required></label>
+        <label>Item Name<input id="addName" maxlength="60" placeholder="e.g. Bashful Bunny" autocomplete="off" required></label>
+        <label>Full Stock<input id="addTarget" type="number" min="0" max="999999" step="1" value="1" inputmode="numeric" required></label>
+        <label>Current On-site<input id="addOnSite" type="number" min="0" max="999999" step="1" value="1" inputmode="numeric" required></label>
       </div>
       <div class="modal-actions">
         <button class="btn soft" type="button" data-close="addDialog">Cancel</button>
@@ -245,12 +342,11 @@
     </form>
   </dialog>
 
-
   <dialog class="batch-dialog" id="batchDialog">
     <form class="modal" id="batchForm">
       <h2>Batch Add from Album</h2>
-      <p>Each photo creates one inventory item. Item names are optional.</p>
-      <div class="batch-status"><span id="batchCount">0 photos selected</span><span>Default quantity: 1</span></div>
+      <p>Each photo creates one item. Names are optional; full stock and current on-site default to 1.</p>
+      <div class="batch-status"><span id="batchCount">0 photos selected</span><span>Blank names become Untitled Item</span></div>
       <div class="batch-list" id="batchItems"></div>
       <div class="modal-actions">
         <button class="btn soft" type="button" data-close="batchDialog">Cancel</button>
@@ -274,73 +370,78 @@
 
   <script>
   (()=>{
-    const KEY='photo-inventory-counter-v1';
+    const KEY='floor-stock-restock-v2';
+    const LEGACY_KEY='photo-inventory-counter-v1';
     const $=selector=>document.querySelector(selector);
     const els={
-      items:$('#items'),summary:$('#summary'),inventorySearch:$('#inventorySearch'),clearSearch:$('#clearSearch'),
-      cameraAdd:$('#cameraAdd'),batchAlbumAdd:$('#batchAlbumAdd'),noPhotoAdd:$('#noPhotoAdd'),
+      items:$('#items'),summary:$('#summary'),metricRestock:$('#metricRestock'),metricRestockDetail:$('#metricRestockDetail'),
+      metricLow:$('#metricLow'),metricLowDetail:$('#metricLowDetail'),metricStock:$('#metricStock'),metricStockDetail:$('#metricStockDetail'),
+      filterRestockCount:$('#filterRestockCount'),filterAllCount:$('#filterAllCount'),filterFullCount:$('#filterFullCount'),
+      inventorySearch:$('#inventorySearch'),clearSearch:$('#clearSearch'),cameraAdd:$('#cameraAdd'),batchAlbumAdd:$('#batchAlbumAdd'),noPhotoAdd:$('#noPhotoAdd'),
       quickPhoto:$('#quickPhoto'),batchPhotoInput:$('#batchPhotoInput'),addPhotoInput:$('#addPhotoInput'),editPhotoInput:$('#editPhotoInput'),
-      addDialog:$('#addDialog'),addForm:$('#addForm'),addPreview:$('#addPreview'),addName:$('#addName'),
+      addDialog:$('#addDialog'),addForm:$('#addForm'),addPreview:$('#addPreview'),addName:$('#addName'),addTarget:$('#addTarget'),addOnSite:$('#addOnSite'),
+      changeAddPhoto:$('#changeAddPhoto'),removeAddPhoto:$('#removeAddPhoto'),saveAdd:$('#saveAdd'),
       batchDialog:$('#batchDialog'),batchForm:$('#batchForm'),batchItems:$('#batchItems'),batchCount:$('#batchCount'),saveBatch:$('#saveBatch'),
-      addQuantity:$('#addQuantity'),changeAddPhoto:$('#changeAddPhoto'),removeAddPhoto:$('#removeAddPhoto'),
-      saveAdd:$('#saveAdd'),deleteDialog:$('#deleteDialog'),deleteForm:$('#deleteForm'),
-      deleteText:$('#deleteText'),toast:$('#toast')
+      deleteDialog:$('#deleteDialog'),deleteForm:$('#deleteForm'),deleteText:$('#deleteText'),toast:$('#toast')
     };
 
     const loaded=loadAndMigrate();
     const state={
-      items:loaded.items,
-      expandedId:null,
-      deleteId:null,
-      addPhoto:'',
-      editPhotoTemp:undefined,
-      batchDrafts:[],
-      batchProcessing:false,
-      pendingCounts:{},
-      searchQuery:''
+      items:loaded.items,expandedId:null,deleteId:null,addPhoto:'',editPhotoTemp:undefined,
+      batchDrafts:[],batchProcessing:false,pendingOnSite:{},searchQuery:'',filter:'restock',addOnSiteTouched:false
     };
     let toastTimer;
-
     if(loaded.changed)persistSilently();
 
     function makeId(){return crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(16).slice(2)}
     function validDate(value){return typeof value==='string'&&!Number.isNaN(Date.parse(value))}
+    function toWhole(value,fallback=0){const n=Number(value);return Number.isInteger(n)&&n>=0&&n<=999999?n:fallback}
+    function shortage(item,onSite=item.onSiteQty){return Math.max(0,item.targetQty-onSite)}
+    function snapshot(item){return{targetQty:item.targetQty,onSiteQty:item.onSiteQty}}
+    function makeLog(action,before,after,at=new Date().toISOString()){
+      return{id:makeId(),at,action,before:{targetQty:before.targetQty,onSiteQty:before.onSiteQty},after:{targetQty:after.targetQty,onSiteQty:after.onSiteQty}}
+    }
+    function normalizeLog(log,itemTarget,index){
+      if(!log||typeof log!=='object')return null;
+      const at=validDate(log.at)?log.at:new Date(Date.now()-index*1000).toISOString();
+      if(log.before&&log.after){
+        const beforeTarget=toWhole(log.before.targetQty,itemTarget);
+        const beforeOnSite=toWhole(log.before.onSiteQty,0);
+        const afterTarget=toWhole(log.after.targetQty,itemTarget);
+        const afterOnSite=toWhole(log.after.onSiteQty,0);
+        return{id:log.id||makeId(),at,action:String(log.action||'Saved stock snapshot'),before:{targetQty:beforeTarget,onSiteQty:beforeOnSite},after:{targetQty:afterTarget,onSiteQty:afterOnSite}}
+      }
+      const from=toWhole(log.from,0),to=toWhole(log.to,0);
+      return{id:log.id||makeId(),at,action:String(log.action||'Legacy quantity snapshot'),before:{targetQty:itemTarget,onSiteQty:from},after:{targetQty:itemTarget,onSiteQty:to}}
+    }
     function loadAndMigrate(){
-      let raw=[];
-      try{const parsed=JSON.parse(localStorage.getItem(KEY)||'[]');raw=Array.isArray(parsed)?parsed:[]}catch{raw=[]}
-      let changed=false;
+      let raw=[],usedLegacy=false;
+      try{
+        const current=JSON.parse(localStorage.getItem(KEY)||'null');
+        if(Array.isArray(current))raw=current;
+        else{
+          const legacy=JSON.parse(localStorage.getItem(LEGACY_KEY)||'[]');
+          if(Array.isArray(legacy)){raw=legacy;usedLegacy=legacy.length>0}
+        }
+      }catch{raw=[]}
+      let changed=usedLegacy;
       const base=Date.now();
       const items=raw.map((item,index)=>{
         const fallback=new Date(base-index*1000).toISOString();
-        const count=Number(item.count);
+        const legacyCount=toWhole(item.count,0);
+        const targetQty=toWhole(item.targetQty,legacyCount);
+        const onSiteQty=toWhole(item.onSiteQty,legacyCount);
+        const createdAt=validDate(item.createdAt)?item.createdAt:fallback;
+        const updatedAt=validDate(item.updatedAt)?item.updatedAt:createdAt;
         const normalized={
-          id:item.id||makeId(),
-          name:String(item.name||'Untitled Item'),
-          count:Number.isInteger(count)&&count>=0?count:0,
-          photo:typeof item.photo==='string'?item.photo:'',
-          createdAt:validDate(item.createdAt)?item.createdAt:fallback,
-          updatedAt:validDate(item.updatedAt)?item.updatedAt:(validDate(item.createdAt)?item.createdAt:fallback),
-          logs:normalizeLogs(item.logs)
+          id:item.id||makeId(),name:String(item.name||'Untitled Item'),photo:typeof item.photo==='string'?item.photo:'',
+          targetQty,onSiteQty,createdAt,updatedAt,lastRestockedAt:validDate(item.lastRestockedAt)?item.lastRestockedAt:'',
+          logs:Array.isArray(item.logs)?item.logs.map((log,logIndex)=>normalizeLog(log,targetQty,logIndex)).filter(Boolean):[]
         };
-        if(!item.id||item.name!==normalized.name||item.count!==normalized.count||item.photo!==normalized.photo||item.createdAt!==normalized.createdAt||item.updatedAt!==normalized.updatedAt||!Array.isArray(item.logs)||item.logs.length!==normalized.logs.length)changed=true;
-        return normalized;
+        if(!item.id||item.targetQty!==targetQty||item.onSiteQty!==onSiteQty||item.count!==undefined||!Array.isArray(item.logs))changed=true;
+        return normalized
       });
       return{items,changed}
-    }
-    function normalizeLogs(logs){
-      if(!Array.isArray(logs))return[];
-      return logs.map((log,index)=>{
-        const from=Number(log&&log.from),to=Number(log&&log.to);
-        if(!Number.isInteger(from)||from<0||!Number.isInteger(to)||to<0)return null;
-        const at=validDate(log.at)?log.at:new Date(Date.now()-index*1000).toISOString();
-        return{
-          id:log.id||makeId(),at,from,to,delta:to-from,
-          action:typeof log.action==='string'&&log.action?log.action:'Saved change'
-        }
-      }).filter(Boolean)
-    }
-    function makeLog(from,to,action,at=new Date().toISOString()){
-      return{id:makeId(),at,from,to,delta:to-from,action}
     }
     function persistSilently(){try{localStorage.setItem(KEY,JSON.stringify(state.items));return true}catch{return false}}
     function save(){
@@ -348,21 +449,11 @@
       catch{notify('Browser storage is full. Delete some items or photos and try again.');return false}
     }
     function esc(value){return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]))}
-    function formatDate(value){
-      try{return new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'short',day:'numeric'}).format(new Date(value))}
-      catch{return 'Unknown'}
-    }
-    function formatDateTime(value){
-      try{return new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value))}
-      catch{return 'Unknown'}
-    }
-    function normalizeSearch(value){
-      return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()
-    }
+    function formatDate(value){try{return new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'short',day:'numeric'}).format(new Date(value))}catch{return 'Unknown'}}
+    function formatDateTime(value){try{return new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value))}catch{return 'Unknown'}}
+    function normalizeSearch(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()}
     function editDistance(a,b){
-      if(a===b)return 0;
-      if(!a.length)return b.length;
-      if(!b.length)return a.length;
+      if(a===b)return 0;if(!a.length)return b.length;if(!b.length)return a.length;
       let previous=Array.from({length:b.length+1},(_,index)=>index);
       for(let i=1;i<=a.length;i++){
         const current=[i];
@@ -377,10 +468,7 @@
     function subsequenceScore(query,text){
       let queryIndex=0,lastIndex=-1,gaps=0;
       for(let index=0;index<text.length&&queryIndex<query.length;index++){
-        if(text[index]===query[queryIndex]){
-          if(lastIndex>=0)gaps+=index-lastIndex-1;
-          lastIndex=index;queryIndex++
-        }
+        if(text[index]===query[queryIndex]){if(lastIndex>=0)gaps+=index-lastIndex-1;lastIndex=index;queryIndex++}
       }
       return queryIndex===query.length?gaps+(text.length-query.length)*.1:Infinity
     }
@@ -391,68 +479,108 @@
         else if(token.startsWith(queryToken))best=Math.min(best,2+(token.length-queryToken.length)*.1);
         else if(token.includes(queryToken))best=Math.min(best,5+token.indexOf(queryToken));
         else if(queryToken.length>=3){
-          const distance=editDistance(queryToken,token);
-          const tolerance=queryToken.length<=4?1:Math.max(1,Math.floor(queryToken.length*.3));
+          const distance=editDistance(queryToken,token),tolerance=queryToken.length<=4?1:Math.max(1,Math.floor(queryToken.length*.3));
           if(distance<=tolerance)best=Math.min(best,12+distance*3+Math.abs(token.length-queryToken.length));
-          const sequence=subsequenceScore(queryToken,token);
-          if(Number.isFinite(sequence))best=Math.min(best,18+sequence)
+          const sequence=subsequenceScore(queryToken,token);if(Number.isFinite(sequence))best=Math.min(best,18+sequence)
         }
       }
       return best
     }
     function fuzzyScore(item,query){
-      const name=normalizeSearch(item.name);
-      if(!query)return 0;
-      if(name===query)return 0;
-      if(name.startsWith(query))return 1+(name.length-query.length)*.01;
-      const directIndex=name.indexOf(query);
-      if(directIndex>=0)return 3+directIndex+(name.length-query.length)*.01;
-      const queryTokens=query.split(/\s+/).filter(Boolean);
-      const nameTokens=name.split(/[^a-z0-9]+/).filter(Boolean);
-      let total=0;
-      for(const queryToken of queryTokens){
-        const score=tokenScore(queryToken,nameTokens);
-        if(!Number.isFinite(score))return Infinity;
-        total+=score
-      }
+      const name=normalizeSearch(item.name);if(!query)return 0;if(name===query)return 0;if(name.startsWith(query))return 1+(name.length-query.length)*.01;
+      const directIndex=name.indexOf(query);if(directIndex>=0)return 3+directIndex+(name.length-query.length)*.01;
+      const queryTokens=query.split(/\s+/).filter(Boolean),nameTokens=name.split(/[^a-z0-9]+/).filter(Boolean);let total=0;
+      for(const token of queryTokens){const score=tokenScore(token,nameTokens);if(!Number.isFinite(score))return Infinity;total+=score}
       return 10+total
+    }
+    function pendingValue(item){const value=state.pendingOnSite[item.id];return Number.isInteger(value)?value:item.onSiteQty}
+    function stageOnSite(item,next,shouldRender=true){
+      if(!Number.isInteger(next)||next<0||next>999999)return;
+      if(next===item.onSiteQty)delete state.pendingOnSite[item.id];else state.pendingOnSite[item.id]=next;
+      if(shouldRender)render()
+    }
+    function restockButtonMarkup(item,isPending){
+      const savedMissing=shortage(item);
+      if(isPending)return '<button class="restock-btn waiting" type="button" disabled>Save first</button>';
+      if(savedMissing>0)return `<button class="restock-btn" type="button" data-action="restock">Restocked +${savedMissing}</button>`;
+      if(item.onSiteQty>item.targetQty)return `<button class="restock-btn over" type="button" disabled>Over +${item.onSiteQty-item.targetQty}</button>`;
+      return '<button class="restock-btn full" type="button" disabled>Full</button>'
+    }
+    function updateQuickRow(record,item,next){
+      const isPending=next!==item.onSiteQty,status=statusInfo(item,next),missing=shortage(item,next);
+      record.classList.toggle('low',status.className==='low');
+      const input=record.querySelector('[data-action="quick-input"]');
+      if(input)input.classList.toggle('pending',isPending);
+      const minus=record.querySelector('[data-action="quick-minus"]');if(minus)minus.disabled=next===0;
+      const saveButton=record.querySelector('[data-action="quick-save"]');
+      if(saveButton){saveButton.disabled=!isPending;saveButton.textContent=!isPending?'Save':next<item.onSiteQty?'Save Sale':'Save Count'}
+      const chip=record.querySelector('.status-chip');
+      if(chip){chip.className=`status-chip ${status.className}`;chip.textContent=status.text}
+      const missingNode=record.querySelector('.restock-number');
+      if(missingNode){missingNode.textContent=missing;missingNode.classList.toggle('needed',missing>0)}
+      const buttonMarkup=restockButtonMarkup(item,isPending);
+      const mobile=record.querySelector('.mobile-restock'),desktop=record.querySelector('.desktop-restock');
+      if(mobile)mobile.innerHTML=buttonMarkup;if(desktop)desktop.innerHTML=buttonMarkup
+    }
+    function filterMatches(item){
+      const need=shortage(item)>0;
+      if(state.filter==='restock')return need;
+      if(state.filter==='full')return !need;
+      return true
     }
     function visibleItems(){
       const query=normalizeSearch(state.searchQuery);
       return state.items.map(item=>({item,score:fuzzyScore(item,query)}))
-        .filter(result=>Number.isFinite(result.score))
-        .sort((a,b)=>a.score-b.score||Date.parse(b.item.updatedAt)-Date.parse(a.item.updatedAt))
+        .filter(result=>Number.isFinite(result.score)&&filterMatches(result.item))
+        .sort((a,b)=>a.score-b.score||shortage(b.item)-shortage(a.item)||Date.parse(b.item.updatedAt)-Date.parse(a.item.updatedAt))
         .map(result=>result.item)
+    }
+    function totals(){
+      const target=state.items.reduce((sum,item)=>sum+item.targetQty,0);
+      const onSite=state.items.reduce((sum,item)=>sum+item.onSiteQty,0);
+      const toRestock=state.items.reduce((sum,item)=>sum+shortage(item),0);
+      const low=state.items.filter(item=>shortage(item)>0).length;
+      const full=state.items.length-low;
+      return{target,onSite,toRestock,low,full}
     }
     function notify(message){
       els.toast.textContent=message;els.toast.classList.add('show');clearTimeout(toastTimer);
-      toastTimer=setTimeout(()=>els.toast.classList.remove('show'),1900)
+      toastTimer=setTimeout(()=>els.toast.classList.remove('show'),2000)
     }
-    function photoMarkup(photo,name,className){
-      return photo?`<img class="${className}" src="${photo}" alt="${esc(name)}">`:`<div class="${className} empty" aria-label="No photo available">No photo</div>`
+    function photoMarkup(photo,name,className){return photo?`<img class="${className}" src="${photo}" alt="${esc(name)}">`:`<div class="${className} empty" aria-label="No photo available">No photo</div>`}
+    function statusInfo(item,onSite=item.onSiteQty){
+      const missing=shortage(item,onSite);
+      if(missing>0)return{className:'low',text:`Needs ${missing}`};
+      if(onSite>item.targetQty)return{className:'over',text:`Over by ${onSite-item.targetQty}`};
+      return{className:'full',text:'Fully stocked'}
     }
-    function pendingCount(item){
-      const value=state.pendingCounts[item.id];
-      return Number.isInteger(value)?value:item.count
-    }
-    function stageQuantity(item,nextCount){
-      if(!Number.isInteger(nextCount)||nextCount<0||nextCount>999999)return;
-      if(nextCount===item.count)delete state.pendingCounts[item.id];
-      else state.pendingCounts[item.id]=nextCount;
-      render()
+    function setFilter(filter){
+      state.filter=filter;
+      document.querySelectorAll('[data-filter]').forEach(button=>button.classList.toggle('active',button.dataset.filter===filter));
+      state.expandedId=null;state.editPhotoTemp=undefined;render()
     }
 
     function render(){
-      const total=state.items.reduce((sum,item)=>sum+item.count,0);
-      els.summary.textContent=`${state.items.length} item type${state.items.length===1?'':'s'} · ${total} total unit${total===1?'':'s'}`;
+      const stats=totals(),percent=stats.target?Math.round(stats.onSite/stats.target*100):0;
+      els.summary.textContent=stats.low?`${stats.low} item type${stats.low===1?'':'s'} need ${stats.toRestock} unit${stats.toRestock===1?'':'s'} replenished`:'Everything is fully stocked';
+      els.metricRestock.textContent=stats.toRestock;
+      els.metricRestockDetail.textContent=stats.toRestock?`${stats.toRestock} unit${stats.toRestock===1?'':'s'} needed across ${stats.low} item type${stats.low===1?'':'s'}`:'No units currently missing';
+      els.metricLow.textContent=stats.low;
+      els.metricLowDetail.textContent=stats.low?`${stats.full} item type${stats.full===1?' is':'s are'} at or above full stock`:'All item types are full';
+      els.metricStock.textContent=`${stats.onSite} / ${stats.target}`;
+      els.metricStockDetail.textContent=`${percent}% of expected floor stock`;
+      els.filterRestockCount.textContent=stats.low;els.filterAllCount.textContent=state.items.length;els.filterFullCount.textContent=stats.full;
       els.clearSearch.hidden=!state.searchQuery;
       if(!state.items.length){
-        els.items.innerHTML='<div class="empty-state"><strong>No inventory yet</strong>Use the + button to photograph your first item, or add one without a photo.</div>';
-        return;
+        els.items.innerHTML='<div class="empty-state"><strong>No floor items yet</strong>Add the expected full stock for each item. Sales will reduce the on-site count and create the restock queue.</div>';return
       }
       const visible=visibleItems();
       if(!visible.length){
-        els.items.innerHTML=`<div class="empty-state"><strong>No matching items</strong>Try a different spelling or clear the search.</div>`;
+        if(state.filter==='restock'&&!state.searchQuery){
+          els.items.innerHTML='<div class="empty-state"><strong>Everything is fully stocked</strong>No replenishment is currently required.<br><button class="btn soft" type="button" data-global-action="view-all">View all items</button></div>'
+        }else{
+          els.items.innerHTML='<div class="empty-state"><strong>No matching items</strong>Try another search or filter.</div>'
+        }
         return
       }
       els.items.innerHTML=visible.map(renderItem).join('')
@@ -461,23 +589,29 @@
     function renderItem(item){
       const expanded=state.expandedId===item.id;
       const stagedPhoto=expanded&&state.editPhotoTemp!==undefined?state.editPhotoTemp:item.photo;
-      const stagedCount=pendingCount(item);
-      const quantityChanged=stagedCount!==item.count;
-      return `<article class="item-record${expanded?' expanded':''}" data-id="${item.id}">
+      const stagedOnSite=pendingValue(item),isPending=stagedOnSite!==item.onSiteQty;
+      const stagedMissing=shortage(item,stagedOnSite),savedMissing=shortage(item);
+      const status=statusInfo(item,stagedOnSite);
+      const saveLabel=!isPending?'Save':stagedOnSite<item.onSiteQty?'Save Sale':'Save Count';
+      const restockButton=restockButtonMarkup(item,isPending);
+      return `<article class="item-record ${status.className==='low'?'low':''}${expanded?' expanded':''}" data-id="${item.id}">
         <div class="inventory-row" role="button" tabindex="0" aria-expanded="${expanded}">
           ${photoMarkup(item.photo,item.name,'thumb')}
           <div class="item-name">
             <strong>${esc(item.name)}</strong>
-            <span class="mobile-meta">Added ${formatDate(item.createdAt)} · Updated ${formatDate(item.updatedAt)}</span>
+            <div class="status-line"><span class="status-chip ${status.className}">${status.text}</span><span class="updated-small">Updated ${formatDate(item.updatedAt)}</span></div>
           </div>
-          <div class="quick-count" aria-label="Quick quantity controls for ${esc(item.name)}">
-            <button class="quick-btn" type="button" data-action="quick-minus" ${stagedCount===0?'disabled':''} aria-label="Subtract one from ${esc(item.name)}">−</button>
-            <span class="quick-value${quantityChanged?' pending':''}" aria-label="${stagedCount} units${quantityChanged?', unsaved':''}">${stagedCount}</span>
-            <button class="quick-btn" type="button" data-action="quick-plus" aria-label="Add one to ${esc(item.name)}">+</button>
-            <button class="quick-save" type="button" data-action="quick-save" ${quantityChanged?'':'disabled'} aria-label="Save quantity for ${esc(item.name)}">Save</button>
+          <div class="quick-count" aria-label="Current on-site controls for ${esc(item.name)}">
+            <button class="quick-btn" type="button" data-action="quick-minus" ${stagedOnSite===0?'disabled':''} aria-label="Record one sold ${esc(item.name)}">−</button>
+            <input class="quick-input${isPending?' pending':''}" data-action="quick-input" type="number" min="0" max="999999" step="1" value="${stagedOnSite}" inputmode="numeric" aria-label="Current on-site quantity for ${esc(item.name)}">
+            <button class="quick-btn" type="button" data-action="quick-plus" aria-label="Increase on-site count for ${esc(item.name)}">+</button>
+            <button class="quick-save" type="button" data-action="quick-save" ${isPending?'':'disabled'}>${saveLabel}</button>
           </div>
-          <div class="date">${formatDate(item.createdAt)}</div>
-          <div class="date">${formatDate(item.updatedAt)}</div>
+          <div class="number-cell desktop-target">${item.targetQty}</div>
+          <div class="target-mobile" hidden>Full stock ${item.targetQty}</div>
+          <div class="restock-cell"><span class="restock-number ${stagedMissing?'needed':''}">${stagedMissing}</span><span class="restock-label">units</span></div>
+          <div class="mobile-restock" hidden>${restockButton}</div>
+          <div class="desktop-restock">${restockButton}</div>
           <details class="settings">
             <summary class="icon-btn" aria-label="Settings for ${esc(item.name)}">•••</summary>
             <div class="settings-menu">
@@ -487,11 +621,12 @@
           </details>
           <button class="icon-btn chevron" type="button" data-action="toggle" aria-label="${expanded?'Collapse':'Expand'} ${esc(item.name)}">⌄</button>
         </div>
-        ${expanded?`<div class="item-details">${renderEditPanel(item,stagedPhoto,stagedCount)}</div>`:''}
+        ${expanded?`<div class="item-details">${renderEditPanel(item,stagedPhoto,stagedOnSite)}</div>`:''}
       </article>`
     }
 
-    function renderEditPanel(item,photo,count){
+    function renderEditPanel(item,photo,onSite){
+      const missing=Math.max(0,item.targetQty-onSite);
       return `<form class="edit-panel" data-edit-form>
         <div class="detail-photo">
           ${photoMarkup(photo,item.name,'detail-preview')}
@@ -502,10 +637,17 @@
         </div>
         <div class="edit-fields">
           <label>Item Name<input name="name" maxlength="60" value="${esc(item.name)}" required></label>
-          <label>Current Quantity<input name="count" type="number" min="0" max="999999" step="1" value="${count}" inputmode="numeric" required></label>
+          <label>Full Stock<input name="targetQty" type="number" min="0" max="999999" step="1" value="${item.targetQty}" inputmode="numeric" required></label>
+          <label>Current On-site<input name="onSiteQty" type="number" min="0" max="999999" step="1" value="${onSite}" inputmode="numeric" required></label>
+          <div class="stock-explainer">
+            <div><span>Expected on-site</span><strong data-detail-target>${item.targetQty}</strong></div>
+            <div><span>Currently on-site</span><strong data-detail-onsite>${onSite}</strong></div>
+            <div><span>Needs replenishment</span><strong data-detail-shortage>${missing}</strong></div>
+          </div>
           <div class="date-info">
             <div><strong>Date added</strong>${formatDateTime(item.createdAt)}</div>
             <div><strong>Last updated</strong>${formatDateTime(item.updatedAt)}</div>
+            <div><strong>Last restocked</strong>${item.lastRestockedAt?formatDateTime(item.lastRestockedAt):'Not recorded'}</div>
           </div>
           <div class="form-actions">
             <button class="btn soft" type="button" data-action="cancel-edit">Cancel</button>
@@ -518,53 +660,42 @@
 
     function renderHistory(item){
       const logs=[...(item.logs||[])].sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));
-      return `<section class="history" aria-label="Quantity history">
-        <div class="history-head"><h3>Change Log</h3><span>${logs.length} record${logs.length===1?'':'s'}</span></div>
+      return `<section class="history" aria-label="Stock history">
+        <div class="history-head"><h3>Stock Log</h3><span>${logs.length} snapshot${logs.length===1?'':'s'}</span></div>
         ${logs.length?`<div class="history-list">${logs.map(log=>{
-          const delta=log.delta>0?`+${log.delta}`:String(log.delta);
-          const deltaClass=log.delta>0?'positive':log.delta<0?'negative':'';
+          const beforeMissing=Math.max(0,log.before.targetQty-log.before.onSiteQty);
+          const afterMissing=Math.max(0,log.after.targetQty-log.after.onSiteQty);
           return `<div class="log-entry">
-            <span class="log-change">${log.from} → ${log.to}</span>
-            <span class="log-delta ${deltaClass}">${delta}</span>
             <span class="log-action">${esc(log.action)}</span>
+            <span class="log-snapshot">On-site <strong>${log.before.onSiteQty} → ${log.after.onSiteQty}</strong> · Full <strong>${log.before.targetQty} → ${log.after.targetQty}</strong> · Restock <strong>${beforeMissing} → ${afterMissing}</strong></span>
             <time class="log-time" datetime="${esc(log.at)}">${formatDateTime(log.at)}</time>
           </div>`
-        }).join('')}</div>`:'<div class="history-empty">No saved quantity changes yet.</div>'}
+        }).join('')}</div>`:'<div class="history-empty">No saved stock snapshots yet.</div>'}
       </section>`
     }
 
-    function commitQuantityChange(item,nextCount,action){
-      if(!Number.isInteger(nextCount)||nextCount<0||nextCount>999999)return false;
-      const previousCount=item.count;
-      const previousUpdatedAt=item.updatedAt;
-      const previousLogs=[...(item.logs||[])];
-      const now=new Date().toISOString();
-      item.count=nextCount;
-      item.updatedAt=now;
-      item.logs=[...previousLogs,makeLog(previousCount,nextCount,action,now)];
+    function commitSnapshot(item,next,action,{restocked=false}={}){
+      const previous={targetQty:item.targetQty,onSiteQty:item.onSiteQty,updatedAt:item.updatedAt,lastRestockedAt:item.lastRestockedAt,logs:[...(item.logs||[])]};
+      const before=snapshot(item),now=new Date().toISOString();
+      item.targetQty=next.targetQty;item.onSiteQty=next.onSiteQty;item.updatedAt=now;
+      if(restocked)item.lastRestockedAt=now;
+      item.logs=[...previous.logs,makeLog(action,before,snapshot(item),now)];
       if(!save()){
-        item.count=previousCount;item.updatedAt=previousUpdatedAt;item.logs=previousLogs;return false
+        item.targetQty=previous.targetQty;item.onSiteQty=previous.onSiteQty;item.updatedAt=previous.updatedAt;item.lastRestockedAt=previous.lastRestockedAt;item.logs=previous.logs;return false
       }
       return true
     }
 
     function compress(file){
       return new Promise((resolve,reject)=>{
-        const reader=new FileReader();
-        reader.onerror=reject;
+        const reader=new FileReader();reader.onerror=reject;
         reader.onload=()=>{
-          const image=new Image();
-          image.onerror=reject;
+          const image=new Image();image.onerror=reject;
           image.onload=()=>{
-            const max=900;
-            const scale=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));
-            const width=Math.max(1,Math.round(image.naturalWidth*scale));
-            const height=Math.max(1,Math.round(image.naturalHeight*scale));
-            const canvas=document.createElement('canvas');
-            const context=canvas.getContext('2d',{alpha:false});
-            canvas.width=width;canvas.height=height;
-            context.fillStyle='#fff';context.fillRect(0,0,width,height);
-            context.imageSmoothingQuality='high';context.drawImage(image,0,0,width,height);
+            const max=900,scale=Math.min(1,max/Math.max(image.naturalWidth,image.naturalHeight));
+            const width=Math.max(1,Math.round(image.naturalWidth*scale)),height=Math.max(1,Math.round(image.naturalHeight*scale));
+            const canvas=document.createElement('canvas'),context=canvas.getContext('2d',{alpha:false});
+            canvas.width=width;canvas.height=height;context.fillStyle='#fff';context.fillRect(0,0,width,height);context.imageSmoothingQuality='high';context.drawImage(image,0,0,width,height);
             resolve(canvas.toDataURL('image/jpeg',.68))
           };
           image.src=reader.result
@@ -572,55 +703,39 @@
         reader.readAsDataURL(file)
       })
     }
-
     function setAddPreview(){
-      els.addPreview.outerHTML=state.addPhoto
-        ?`<img id="addPreview" class="add-preview" src="${state.addPhoto}" alt="New item photo preview">`
-        :'<div id="addPreview" class="add-preview empty">No photo selected</div>';
-      els.addPreview=$('#addPreview');
-      els.removeAddPhoto.disabled=!state.addPhoto
+      els.addPreview.outerHTML=state.addPhoto?`<img id="addPreview" class="add-preview" src="${state.addPhoto}" alt="New item photo preview">`:'<div id="addPreview" class="add-preview empty">No photo selected</div>';
+      els.addPreview=$('#addPreview');els.removeAddPhoto.disabled=!state.addPhoto
     }
-
+    function openAdd(photo=''){
+      state.addPhoto=photo;state.addOnSiteTouched=false;els.addForm.reset();els.addTarget.value='1';els.addOnSite.value='1';setAddPreview();els.addDialog.showModal();setTimeout(()=>els.addName.focus(),50)
+    }
     function renderBatchDrafts(){
       els.batchCount.textContent=`${state.batchDrafts.length} photo${state.batchDrafts.length===1?'':'s'} selected`;
       els.saveBatch.disabled=!state.batchDrafts.length||state.batchProcessing;
       els.batchItems.innerHTML=state.batchDrafts.map((draft,index)=>`<div class="batch-row" data-batch-id="${draft.id}">
         <img class="batch-photo" src="${draft.photo}" alt="Selected photo ${index+1}">
-        <label>Item Name <span class="visually-hidden">optional</span><input data-batch-name maxlength="60" value="${esc(draft.name||'')}" placeholder="Optional — defaults to Untitled Item" autocomplete="off"></label>
-        <label>Quantity<input data-batch-count type="number" min="0" max="999999" step="1" value="${Number.isInteger(draft.count)?draft.count:1}" inputmode="numeric" required></label>
+        <label>Item Name<input data-batch-name maxlength="60" value="${esc(draft.name||'')}" placeholder="Optional" autocomplete="off"></label>
+        <label>Full Stock<input data-batch-target type="number" min="0" max="999999" step="1" value="${draft.targetQty}" inputmode="numeric" required></label>
+        <label>On-site<input data-batch-onsite type="number" min="0" max="999999" step="1" value="${draft.onSiteQty}" inputmode="numeric" required></label>
         <button class="batch-remove" type="button" data-batch-remove aria-label="Remove selected photo ${index+1}">×</button>
       </div>`).join('')
     }
     async function openBatch(files){
       const imageFiles=Array.from(files||[]).filter(file=>file.type.startsWith('image/'));
       if(!imageFiles.length){notify('Please select one or more image files.');return}
-      state.batchProcessing=true;els.batchAlbumAdd.disabled=true;
-      const drafts=[];
+      state.batchProcessing=true;els.batchAlbumAdd.disabled=true;const drafts=[];
       try{
         for(let index=0;index<imageFiles.length;index++){
           notify(`Processing photo ${index+1} of ${imageFiles.length}…`);
-          try{drafts.push({id:makeId(),photo:await compress(imageFiles[index]),name:'',count:1})}
-          catch{}
+          try{drafts.push({id:makeId(),photo:await compress(imageFiles[index]),name:'',targetQty:1,onSiteQty:1})}catch{}
         }
-      }finally{
-        state.batchProcessing=false;els.batchAlbumAdd.disabled=false
-      }
+      }finally{state.batchProcessing=false;els.batchAlbumAdd.disabled=false}
       if(!drafts.length){notify('Unable to process the selected photos.');return}
-      state.batchDrafts=drafts;
-      renderBatchDrafts();
-      els.batchDialog.showModal()
-    }
-    function openAdd(photo=''){
-      state.addPhoto=photo;
-      els.addForm.reset();
-      els.addQuantity.value='1';
-      setAddPreview();
-      els.addDialog.showModal();
-      setTimeout(()=>els.addName.focus(),50)
+      state.batchDrafts=drafts;renderBatchDrafts();els.batchDialog.showModal()
     }
     async function processPhoto(file,mode){
-      if(!file)return;
-      if(!file.type.startsWith('image/')){notify('Please select an image file.');return}
+      if(!file)return;if(!file.type.startsWith('image/')){notify('Please select an image file.');return}
       notify('Processing photo…');
       try{
         const compressed=await compress(file);
@@ -629,7 +744,6 @@
         if(mode==='edit'){state.editPhotoTemp=compressed;render()}
       }catch{notify('Unable to read this photo.')}
     }
-
     function toggleItem(id,forceOpen=false){
       if(state.expandedId===id&&!forceOpen){state.expandedId=null;state.editPhotoTemp=undefined}
       else{state.expandedId=id;state.editPhotoTemp=undefined}
@@ -639,188 +753,156 @@
 
     els.inventorySearch.addEventListener('input',event=>{state.searchQuery=event.target.value;render()});
     els.clearSearch.addEventListener('click',()=>{state.searchQuery='';els.inventorySearch.value='';render();els.inventorySearch.focus()});
-
+    document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>setFilter(button.dataset.filter)));
     els.cameraAdd.addEventListener('click',()=>els.quickPhoto.click());
     els.batchAlbumAdd.addEventListener('click',()=>els.batchPhotoInput.click());
     els.noPhotoAdd.addEventListener('click',()=>openAdd(''));
-    els.quickPhoto.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'quick');event.target.value='' });
-    els.batchPhotoInput.addEventListener('change',async event=>{await openBatch(event.target.files);event.target.value='' });
-    els.addPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'add');event.target.value='' });
-    els.editPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'edit');event.target.value='' });
+    els.quickPhoto.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'quick');event.target.value=''});
+    els.batchPhotoInput.addEventListener('change',async event=>{await openBatch(event.target.files);event.target.value=''});
+    els.addPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'add');event.target.value=''});
+    els.editPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'edit');event.target.value=''});
     els.changeAddPhoto.addEventListener('click',()=>els.addPhotoInput.click());
     els.removeAddPhoto.addEventListener('click',()=>{state.addPhoto='';setAddPreview()});
-
+    els.addTarget.addEventListener('input',()=>{if(!state.addOnSiteTouched)els.addOnSite.value=els.addTarget.value});
+    els.addOnSite.addEventListener('input',()=>{state.addOnSiteTouched=true});
 
     els.batchItems.addEventListener('input',event=>{
-      const row=event.target.closest('[data-batch-id]');
-      if(!row)return;
-      const draft=state.batchDrafts.find(value=>value.id===row.dataset.batchId);
-      if(!draft)return;
+      const row=event.target.closest('[data-batch-id]');if(!row)return;
+      const draft=state.batchDrafts.find(value=>value.id===row.dataset.batchId);if(!draft)return;
       if(event.target.matches('[data-batch-name]'))draft.name=event.target.value;
-      if(event.target.matches('[data-batch-count]'))draft.count=Number(event.target.value)
+      if(event.target.matches('[data-batch-target]')){draft.targetQty=Number(event.target.value);if(!draft.onSiteTouched){draft.onSiteQty=draft.targetQty;row.querySelector('[data-batch-onsite]').value=event.target.value}}
+      if(event.target.matches('[data-batch-onsite]')){draft.onSiteQty=Number(event.target.value);draft.onSiteTouched=true}
     });
-
     els.batchItems.addEventListener('click',event=>{
-      const remove=event.target.closest('[data-batch-remove]');
-      if(!remove)return;
-      const row=remove.closest('[data-batch-id]');
-      state.batchDrafts=state.batchDrafts.filter(draft=>draft.id!==row.dataset.batchId);
-      renderBatchDrafts();
-      if(!state.batchDrafts.length)els.batchDialog.close()
+      const remove=event.target.closest('[data-batch-remove]');if(!remove)return;
+      const row=remove.closest('[data-batch-id]');state.batchDrafts=state.batchDrafts.filter(draft=>draft.id!==row.dataset.batchId);renderBatchDrafts();if(!state.batchDrafts.length)els.batchDialog.close()
     });
-
     els.batchForm.addEventListener('submit',event=>{
-      event.preventDefault();
-      const rows=Array.from(els.batchItems.querySelectorAll('[data-batch-id]'));
-      if(!rows.length)return notify('No photos remain in this batch.');
-      const now=Date.now();
-      const created=[];
+      event.preventDefault();const rows=Array.from(els.batchItems.querySelectorAll('[data-batch-id]'));if(!rows.length)return notify('No photos remain in this batch.');
+      const now=Date.now(),created=[];
       for(let index=0;index<rows.length;index++){
-        const row=rows[index];
-        const draft=state.batchDrafts.find(value=>value.id===row.dataset.batchId);
-        if(!draft)continue;
+        const row=rows[index],draft=state.batchDrafts.find(value=>value.id===row.dataset.batchId);if(!draft)continue;
         const name=row.querySelector('[data-batch-name]').value.trim()||'Untitled Item';
-        const count=Number(row.querySelector('[data-batch-count]').value);
-        if(!Number.isInteger(count)||count<0||count>999999){
-          row.querySelector('[data-batch-count]').focus();
-          return notify('Each quantity must be a valid whole number.')
-        }
-        const at=new Date(now+index).toISOString();
-        created.push({id:makeId(),name,count,photo:draft.photo,createdAt:at,updatedAt:at,logs:[makeLog(0,count,'Item created by batch import',at)]})
+        const targetQty=Number(row.querySelector('[data-batch-target]').value),onSiteQty=Number(row.querySelector('[data-batch-onsite]').value);
+        if(!Number.isInteger(targetQty)||targetQty<0||targetQty>999999){row.querySelector('[data-batch-target]').focus();return notify('Each full stock value must be a valid whole number.')}
+        if(!Number.isInteger(onSiteQty)||onSiteQty<0||onSiteQty>999999){row.querySelector('[data-batch-onsite]').focus();return notify('Each on-site value must be a valid whole number.')}
+        const at=new Date(now+index).toISOString(),item={id:makeId(),name,photo:draft.photo,targetQty,onSiteQty,createdAt:at,updatedAt:at,lastRestockedAt:'',logs:[]};
+        item.logs=[makeLog('Item created by batch import',{targetQty:0,onSiteQty:0},snapshot(item),at)];created.push(item)
       }
-      if(!created.length)return notify('No items were created.');
-      state.items.push(...created);
-      if(!save()){
-        state.items.splice(state.items.length-created.length,created.length);
-        return
-      }
+      if(!created.length)return notify('No items were created.');state.items.push(...created);
+      if(!save()){state.items.splice(state.items.length-created.length,created.length);return}
       state.batchDrafts=[];els.batchDialog.close();render();notify(`${created.length} item${created.length===1?'':'s'} added.`)
     });
-
     els.addForm.addEventListener('submit',event=>{
-      event.preventDefault();
-      const name=els.addName.value.trim();
-      const count=Number(els.addQuantity.value);
+      event.preventDefault();const name=els.addName.value.trim(),targetQty=Number(els.addTarget.value),onSiteQty=Number(els.addOnSite.value);
       if(!name){els.addName.focus();return notify('Please enter an item name.')}
-      if(!Number.isInteger(count)||count<0)return notify('Please enter a valid whole-number quantity.');
+      if(!Number.isInteger(targetQty)||targetQty<0||targetQty>999999)return notify('Please enter a valid full stock level.');
+      if(!Number.isInteger(onSiteQty)||onSiteQty<0||onSiteQty>999999)return notify('Please enter a valid current on-site count.');
       if(!state.addPhoto&&!confirm('Save this item without a photo?'))return;
-      const now=new Date().toISOString();
-      const item={id:makeId(),name,count,photo:state.addPhoto,createdAt:now,updatedAt:now,logs:[makeLog(0,count,'Item created',now)]};
-      state.items.push(item);
+      const now=new Date().toISOString(),item={id:makeId(),name,photo:state.addPhoto,targetQty,onSiteQty,createdAt:now,updatedAt:now,lastRestockedAt:'',logs:[]};
+      item.logs=[makeLog('Item created',{targetQty:0,onSiteQty:0},snapshot(item),now)];state.items.push(item);
       if(!save()){state.items.pop();return}
       els.addDialog.close();state.addPhoto='';render();notify('Item added.')
     });
 
+    els.items.addEventListener('input',event=>{
+      if(event.target.dataset.action==='quick-input'){
+        const record=event.target.closest('.item-record'),item=state.items.find(value=>value.id===record.dataset.id),next=Number(event.target.value);
+        if(item&&Number.isInteger(next)&&next>=0&&next<=999999){stageOnSite(item,next,false);updateQuickRow(record,item,next)}
+      }
+      const form=event.target.closest('[data-edit-form]');
+      if(form&&(event.target.name==='targetQty'||event.target.name==='onSiteQty')){
+        const target=Number(form.elements.targetQty.value),onSite=Number(form.elements.onSiteQty.value);
+        if(Number.isInteger(target)&&target>=0&&Number.isInteger(onSite)&&onSite>=0){
+          form.querySelector('[data-detail-target]').textContent=target;
+          form.querySelector('[data-detail-onsite]').textContent=onSite;
+          form.querySelector('[data-detail-shortage]').textContent=Math.max(0,target-onSite)
+        }
+      }
+    });
+    els.items.addEventListener('change',event=>{
+      if(event.target.dataset.action!=='quick-input')return;
+      const record=event.target.closest('.item-record'),item=state.items.find(value=>value.id===record.dataset.id),next=Number(event.target.value);
+      if(!item)return;
+      if(!Number.isInteger(next)||next<0||next>999999){event.target.value=pendingValue(item);notify('Enter a valid whole-number on-site count.')}
+    });
     els.items.addEventListener('click',event=>{
-      const actionButton=event.target.closest('[data-action]');
-      const record=event.target.closest('.item-record');
-      if(!record)return;
-      const id=record.dataset.id;
+      const globalAction=event.target.closest('[data-global-action]');if(globalAction){if(globalAction.dataset.globalAction==='view-all')setFilter('all');return}
+      const actionButton=event.target.closest('[data-action]'),record=event.target.closest('.item-record');if(!record)return;
+      const id=record.dataset.id,item=state.items.find(value=>value.id===id);if(!item)return;
       if(actionButton){
         const action=actionButton.dataset.action;
         if(action==='toggle'||action==='edit'){closeSettings(actionButton);toggleItem(id,action==='edit');return}
         if(action==='quick-plus'||action==='quick-minus'){
-          const item=state.items.find(value=>value.id===id);
-          if(!item)return;
-          const next=pendingCount(item)+(action==='quick-plus'?1:-1);
-          if(next<0)return;
-          stageQuantity(item,next);
-          return
+          const next=pendingValue(item)+(action==='quick-plus'?1:-1);if(next>=0)stageOnSite(item,next);return
         }
         if(action==='quick-save'){
-          const item=state.items.find(value=>value.id===id);
-          if(!item)return;
-          const next=pendingCount(item);
-          if(next===item.count)return;
-          const previous=item.count;
-          if(commitQuantityChange(item,next,'Quantity snapshot')){
-            delete state.pendingCounts[id];
-            render();notify(`Saved ${previous} → ${next}.`)
+          const next=pendingValue(item);if(next===item.onSiteQty)return;
+          const old=item.onSiteQty,difference=next-old;
+          const label=difference<0?`Sales saved: ${Math.abs(difference)} sold`:`On-site count adjusted +${difference}`;
+          if(commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:next},label)){
+            delete state.pendingOnSite[id];render();notify(`Saved ${old} → ${next}.`)
+          }
+          return
+        }
+        if(action==='restock'){
+          const amount=shortage(item);if(amount<=0)return;
+          if(commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:item.targetQty},`Restocked +${amount}`,{restocked:true})){
+            delete state.pendingOnSite[id];render();notify(`${item.name} restocked by ${amount}.`)
           }
           return
         }
         if(action==='delete'){
-          closeSettings(actionButton);state.deleteId=id;
-          const item=state.items.find(value=>value.id===id);
-          els.deleteText.textContent=`“${item.name}” will be permanently deleted. This action cannot be undone.`;
-          els.deleteDialog.showModal();return
+          closeSettings(actionButton);state.deleteId=id;els.deleteText.textContent=`“${item.name}” and its stock history will be permanently deleted.`;els.deleteDialog.showModal();return
         }
         if(action==='edit-photo'){els.editPhotoInput.click();return}
         if(action==='remove-photo'){state.editPhotoTemp=null;render();return}
-        if(action==='cancel-edit'){delete state.pendingCounts[id];state.expandedId=null;state.editPhotoTemp=undefined;render();return}
+        if(action==='cancel-edit'){delete state.pendingOnSite[id];state.expandedId=null;state.editPhotoTemp=undefined;render();return}
       }
-      if(event.target.closest('button,input,label,summary,details,.item-details'))return;
-      toggleItem(id)
+      if(event.target.closest('button,input,label,summary,details,.item-details'))return;toggleItem(id)
     });
-
     els.items.addEventListener('keydown',event=>{
-      if((event.key==='Enter'||event.key===' ')&&event.target.classList.contains('inventory-row')){
-        event.preventDefault();toggleItem(event.target.closest('.item-record').dataset.id)
-      }
+      if((event.key==='Enter'||event.key===' ')&&event.target.classList.contains('inventory-row')){event.preventDefault();toggleItem(event.target.closest('.item-record').dataset.id)}
     });
-
     els.items.addEventListener('submit',event=>{
-      const form=event.target.closest('[data-edit-form]');
-      if(!form)return;
-      event.preventDefault();
-      const record=form.closest('.item-record');
-      const item=state.items.find(value=>value.id===record.dataset.id);
-      if(!item)return;
-      const name=form.elements.name.value.trim();
-      const count=Number(form.elements.count.value);
+      const form=event.target.closest('[data-edit-form]');if(!form)return;event.preventDefault();
+      const record=form.closest('.item-record'),item=state.items.find(value=>value.id===record.dataset.id);if(!item)return;
+      const name=form.elements.name.value.trim(),targetQty=Number(form.elements.targetQty.value),onSiteQty=Number(form.elements.onSiteQty.value);
       if(!name){form.elements.name.focus();return notify('Please enter an item name.')}
-      if(!Number.isInteger(count)||count<0)return notify('Please enter a valid whole-number quantity.');
-      const previous={...item,logs:[...(item.logs||[])]};
-      const previousCount=item.count;
-      const now=new Date().toISOString();
-      item.name=name;item.count=count;
+      if(!Number.isInteger(targetQty)||targetQty<0||targetQty>999999)return notify('Please enter a valid full stock level.');
+      if(!Number.isInteger(onSiteQty)||onSiteQty<0||onSiteQty>999999)return notify('Please enter a valid current on-site count.');
+      const previous={name:item.name,photo:item.photo,targetQty:item.targetQty,onSiteQty:item.onSiteQty,updatedAt:item.updatedAt,lastRestockedAt:item.lastRestockedAt,logs:[...(item.logs||[])]};
+      const before=snapshot(item),now=new Date().toISOString();item.name=name;item.targetQty=targetQty;item.onSiteQty=onSiteQty;
       if(state.editPhotoTemp!==undefined)item.photo=state.editPhotoTemp||'';
       item.updatedAt=now;
-      item.logs=[...(item.logs||[]),makeLog(previousCount,count,count===previousCount?'Saved item details':'Saved quantity change',now)];
+      let action='Item details saved';
+      if(onSiteQty<before.onSiteQty)action=`Sales snapshot saved: ${before.onSiteQty-onSiteQty} sold`;
+      else if(onSiteQty>before.onSiteQty)action=`On-site count adjusted +${onSiteQty-before.onSiteQty}`;
+      if(targetQty!==before.targetQty)action=onSiteQty!==before.onSiteQty?'Stock levels updated':'Full stock level changed';
+      item.logs=[...previous.logs,makeLog(action,before,snapshot(item),now)];
       if(!save()){Object.assign(item,previous);return}
-      delete state.pendingCounts[item.id];
-      state.expandedId=null;state.editPhotoTemp=undefined;render();notify('Item updated.')
+      delete state.pendingOnSite[item.id];state.expandedId=null;state.editPhotoTemp=undefined;render();notify('Item updated.')
     });
-
     els.deleteForm.addEventListener('submit',event=>{
-      event.preventDefault();
-      const index=state.items.findIndex(item=>item.id===state.deleteId);
-      if(index<0)return;
-      const removed=state.items.splice(index,1)[0];
-      if(!save()){state.items.splice(index,0,removed);return}
+      event.preventDefault();const index=state.items.findIndex(item=>item.id===state.deleteId);if(index<0)return;
+      const removed=state.items.splice(index,1)[0];if(!save()){state.items.splice(index,0,removed);return}
       if(state.expandedId===removed.id){state.expandedId=null;state.editPhotoTemp=undefined}
-      delete state.pendingCounts[removed.id];
-      state.deleteId=null;els.deleteDialog.close();render();notify(`Deleted ${removed.name}.`)
+      delete state.pendingOnSite[removed.id];state.deleteId=null;els.deleteDialog.close();render();notify(`Deleted ${removed.name}.`)
     });
-
     document.addEventListener('click',event=>{
-      const dialogId=event.target.dataset.close;
-      if(dialogId)document.getElementById(dialogId).close();
+      const dialogId=event.target.dataset.close;if(dialogId)document.getElementById(dialogId).close();
       if(!event.target.closest('.settings'))document.querySelectorAll('.settings[open]').forEach(menu=>menu.open=false)
     });
     [els.addDialog,els.batchDialog,els.deleteDialog].forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
     els.addDialog.addEventListener('close',()=>{state.addPhoto=''});
     els.batchDialog.addEventListener('close',()=>{state.batchDrafts=[];els.batchItems.innerHTML=''});
 
-    // Lock page zoom while preserving ordinary one-finger scrolling.
-    ['gesturestart','gesturechange','gestureend'].forEach(type=>{
-      document.addEventListener(type,event=>event.preventDefault(),{passive:false})
-    });
-    document.addEventListener('touchmove',event=>{
-      if(event.touches&&event.touches.length>1)event.preventDefault()
-    },{passive:false});
+    ['gesturestart','gesturechange','gestureend'].forEach(type=>document.addEventListener(type,event=>event.preventDefault(),{passive:false}));
+    document.addEventListener('touchmove',event=>{if(event.touches&&event.touches.length>1)event.preventDefault()},{passive:false});
     let lastTouchEnd=0;
-    document.addEventListener('touchend',event=>{
-      const now=Date.now();
-      if(now-lastTouchEnd<=300)event.preventDefault();
-      lastTouchEnd=now
-    },{passive:false});
-    document.addEventListener('wheel',event=>{
-      if(event.ctrlKey||event.metaKey)event.preventDefault()
-    },{passive:false});
-    document.addEventListener('keydown',event=>{
-      if((event.ctrlKey||event.metaKey)&&['+','=','-','0'].includes(event.key))event.preventDefault()
-    });
+    document.addEventListener('touchend',event=>{const now=Date.now();if(now-lastTouchEnd<=300)event.preventDefault();lastTouchEnd=now},{passive:false});
+    document.addEventListener('wheel',event=>{if(event.ctrlKey||event.metaKey)event.preventDefault()},{passive:false});
+    document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&['+','=','-','0'].includes(event.key))event.preventDefault()});
 
     render();
   })();
