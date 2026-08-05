@@ -24,11 +24,11 @@
 
     .inventory{border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:visible}
     .list-head,.inventory-row{
-      display:grid;grid-template-columns:58px minmax(180px,1fr) 92px 132px 132px 42px 42px;
+      display:grid;grid-template-columns:58px minmax(180px,1fr) 164px 124px 124px 42px 42px;
       gap:12px;align-items:center
     }
     .list-head{padding:11px 14px;color:var(--muted);font-size:11px;font-weight:750;letter-spacing:.055em;text-transform:uppercase;border-bottom:1px solid var(--line)}
-    .list-head span:nth-child(3){text-align:right}
+    .list-head span:nth-child(3){text-align:center}
     .item-record{position:relative;border-bottom:1px solid var(--line)}
     .item-record:last-child{border-bottom:0}
     .inventory-row{min-height:78px;padding:10px 14px;cursor:pointer;transition:background .15s}
@@ -39,7 +39,11 @@
     .item-name{min-width:0}
     .item-name strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
     .mobile-meta{display:none;margin-top:4px;color:var(--muted);font-size:11px;line-height:1.4}
-    .quantity{text-align:right;font-size:22px;font-weight:780;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+    .quick-count{display:grid;grid-template-columns:40px minmax(48px,1fr) 40px;gap:6px;align-items:center}
+    .quick-btn{display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid var(--line);border-radius:10px;background:#f5f5f2;color:var(--ink);font-size:22px;line-height:1}
+    .quick-btn:hover{background:#ecece8}
+    .quick-btn:disabled{opacity:.4;cursor:not-allowed}
+    .quick-value{text-align:center;font-size:21px;font-weight:780;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
     .date{color:var(--muted);font-size:12px;line-height:1.35}
     .icon-btn{display:grid;place-items:center;width:38px;height:38px;padding:0;border:0;border-radius:10px;background:transparent;color:var(--muted)}
     .icon-btn:hover{background:#ecece8;color:var(--ink)}
@@ -67,6 +71,19 @@
     .date-info{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;border-radius:11px;background:#f4f4f1;color:var(--muted);font-size:12px;line-height:1.45}
     .date-info strong{display:block;color:var(--ink);font-size:12px}
     .form-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:9px;margin-top:3px}
+    .history{grid-column:1/-1;margin-top:5px;border-top:1px solid var(--line);padding-top:15px}
+    .history-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:9px}
+    .history-head h3{margin:0;font-size:14px}
+    .history-head span{color:var(--muted);font-size:11px}
+    .history-list{display:grid;gap:7px;max-height:260px;overflow:auto;padding-right:3px}
+    .log-entry{display:grid;grid-template-columns:minmax(100px,auto) 60px minmax(110px,1fr) auto;gap:10px;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#f8f8f4;font-size:12px}
+    .log-change{font-weight:760;font-variant-numeric:tabular-nums}
+    .log-delta{font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
+    .log-delta.positive{color:#52721d}
+    .log-delta.negative{color:var(--danger)}
+    .log-action,.log-time{color:var(--muted)}
+    .log-time{text-align:right;white-space:nowrap;font-size:11px}
+    .history-empty{padding:14px;border:1px dashed var(--line);border-radius:10px;color:var(--muted);font-size:12px;text-align:center}
 
     .empty-state{padding:70px 20px;color:var(--muted);text-align:center}
     .empty-state strong{display:block;margin-bottom:7px;color:var(--ink);font-size:17px}
@@ -102,10 +119,12 @@
       header{align-items:start}
       .desktop-note{display:none}
       .list-head{display:none}
-      .inventory-row{grid-template-columns:56px minmax(0,1fr) 64px 38px 38px;gap:9px;padding:10px}
+      .inventory-row{grid-template-columns:56px minmax(0,1fr) 142px 38px 38px;gap:9px;padding:10px}
       .inventory-row>.date{display:none}
       .mobile-meta{display:block}
-      .quantity{font-size:20px}
+      .quick-count{grid-template-columns:36px minmax(42px,1fr) 36px;gap:4px}
+      .quick-btn{width:36px;height:36px}
+      .quick-value{font-size:19px}
       .edit-panel{grid-template-columns:1fr;padding:14px}
       .detail-photo{grid-template-columns:120px 1fr;align-items:start}
       .detail-preview{width:120px}
@@ -113,10 +132,12 @@
     }
     @media(max-width:520px){
       h1{font-size:32px}
-      .inventory-row{grid-template-columns:50px minmax(0,1fr) 50px 34px 34px;gap:7px}
+      .inventory-row{grid-template-columns:50px minmax(0,1fr) 124px 34px 34px;gap:7px}
       .thumb{width:48px;height:48px}
       .icon-btn{width:34px;height:34px}
-      .quantity{font-size:18px}
+      .quick-count{grid-template-columns:32px minmax(38px,1fr) 32px}
+      .quick-btn{width:32px;height:32px;font-size:19px}
+      .quick-value{font-size:17px}
       .item-name strong{font-size:14px}
       .edit-fields,.modal-grid{grid-template-columns:1fr}
       .date-info{grid-template-columns:1fr}
@@ -124,6 +145,9 @@
       .detail-photo{grid-template-columns:1fr}
       .detail-preview{width:100%}
       .photo-actions{grid-template-columns:1fr 1fr}
+      .log-entry{grid-template-columns:1fr auto;gap:5px 10px}
+      .log-action{grid-column:1}
+      .log-time{grid-column:2;grid-row:2}
     }
   </style>
 </head>
@@ -228,12 +252,28 @@
           count:Number.isInteger(count)&&count>=0?count:0,
           photo:typeof item.photo==='string'?item.photo:'',
           createdAt:validDate(item.createdAt)?item.createdAt:fallback,
-          updatedAt:validDate(item.updatedAt)?item.updatedAt:(validDate(item.createdAt)?item.createdAt:fallback)
+          updatedAt:validDate(item.updatedAt)?item.updatedAt:(validDate(item.createdAt)?item.createdAt:fallback),
+          logs:normalizeLogs(item.logs)
         };
-        if(!item.id||item.name!==normalized.name||item.count!==normalized.count||item.photo!==normalized.photo||item.createdAt!==normalized.createdAt||item.updatedAt!==normalized.updatedAt)changed=true;
+        if(!item.id||item.name!==normalized.name||item.count!==normalized.count||item.photo!==normalized.photo||item.createdAt!==normalized.createdAt||item.updatedAt!==normalized.updatedAt||!Array.isArray(item.logs)||item.logs.length!==normalized.logs.length)changed=true;
         return normalized;
       });
       return{items,changed}
+    }
+    function normalizeLogs(logs){
+      if(!Array.isArray(logs))return[];
+      return logs.map((log,index)=>{
+        const from=Number(log&&log.from),to=Number(log&&log.to);
+        if(!Number.isInteger(from)||from<0||!Number.isInteger(to)||to<0)return null;
+        const at=validDate(log.at)?log.at:new Date(Date.now()-index*1000).toISOString();
+        return{
+          id:log.id||makeId(),at,from,to,delta:to-from,
+          action:typeof log.action==='string'&&log.action?log.action:'Saved change'
+        }
+      }).filter(Boolean)
+    }
+    function makeLog(from,to,action,at=new Date().toISOString()){
+      return{id:makeId(),at,from,to,delta:to-from,action}
     }
     function persistSilently(){try{localStorage.setItem(KEY,JSON.stringify(state.items));return true}catch{return false}}
     function save(){
@@ -278,7 +318,11 @@
             <strong>${esc(item.name)}</strong>
             <span class="mobile-meta">Added ${formatDate(item.createdAt)} · Updated ${formatDate(item.updatedAt)}</span>
           </div>
-          <div class="quantity" aria-label="${item.count} units">${item.count}</div>
+          <div class="quick-count" aria-label="Quick quantity controls for ${esc(item.name)}">
+            <button class="quick-btn" type="button" data-action="quick-minus" ${item.count===0?'disabled':''} aria-label="Subtract one from ${esc(item.name)}">−</button>
+            <span class="quick-value" aria-label="${item.count} units">${item.count}</span>
+            <button class="quick-btn" type="button" data-action="quick-plus" aria-label="Add one to ${esc(item.name)}">+</button>
+          </div>
           <div class="date">${formatDate(item.createdAt)}</div>
           <div class="date">${formatDate(item.updatedAt)}</div>
           <details class="settings">
@@ -314,8 +358,41 @@
             <button class="btn soft" type="button" data-action="cancel-edit">Cancel</button>
             <button class="btn primary">Save Changes</button>
           </div>
+          ${renderHistory(item)}
         </div>
       </form>`
+    }
+
+    function renderHistory(item){
+      const logs=[...(item.logs||[])].sort((a,b)=>Date.parse(b.at)-Date.parse(a.at));
+      return `<section class="history" aria-label="Quantity history">
+        <div class="history-head"><h3>Change Log</h3><span>${logs.length} record${logs.length===1?'':'s'}</span></div>
+        ${logs.length?`<div class="history-list">${logs.map(log=>{
+          const delta=log.delta>0?`+${log.delta}`:String(log.delta);
+          const deltaClass=log.delta>0?'positive':log.delta<0?'negative':'';
+          return `<div class="log-entry">
+            <span class="log-change">${log.from} → ${log.to}</span>
+            <span class="log-delta ${deltaClass}">${delta}</span>
+            <span class="log-action">${esc(log.action)}</span>
+            <time class="log-time" datetime="${esc(log.at)}">${formatDateTime(log.at)}</time>
+          </div>`
+        }).join('')}</div>`:'<div class="history-empty">No saved quantity changes yet.</div>'}
+      </section>`
+    }
+
+    function commitQuantityChange(item,nextCount,action){
+      if(!Number.isInteger(nextCount)||nextCount<0||nextCount>999999)return false;
+      const previousCount=item.count;
+      const previousUpdatedAt=item.updatedAt;
+      const previousLogs=[...(item.logs||[])];
+      const now=new Date().toISOString();
+      item.count=nextCount;
+      item.updatedAt=now;
+      item.logs=[...previousLogs,makeLog(previousCount,nextCount,action,now)];
+      if(!save()){
+        item.count=previousCount;item.updatedAt=previousUpdatedAt;item.logs=previousLogs;return false
+      }
+      return true
     }
 
     function compress(file){
@@ -393,7 +470,7 @@
       if(!Number.isInteger(count)||count<0)return notify('Please enter a valid whole-number quantity.');
       if(!state.addPhoto&&!confirm('Save this item without a photo?'))return;
       const now=new Date().toISOString();
-      const item={id:makeId(),name,count,photo:state.addPhoto,createdAt:now,updatedAt:now};
+      const item={id:makeId(),name,count,photo:state.addPhoto,createdAt:now,updatedAt:now,logs:[makeLog(0,count,'Item created',now)]};
       state.items.push(item);
       if(!save()){state.items.pop();return}
       els.addDialog.close();state.addPhoto='';render();notify('Item added.')
@@ -407,6 +484,14 @@
       if(actionButton){
         const action=actionButton.dataset.action;
         if(action==='toggle'||action==='edit'){closeSettings(actionButton);toggleItem(id,action==='edit');return}
+        if(action==='quick-plus'||action==='quick-minus'){
+          const item=state.items.find(value=>value.id===id);
+          if(!item)return;
+          const next=item.count+(action==='quick-plus'?1:-1);
+          if(next<0)return;
+          if(commitQuantityChange(item,next,action==='quick-plus'?'Quick +1':'Quick −1')){render();notify(action==='quick-plus'?'Added 1 unit.':'Removed 1 unit.')}
+          return
+        }
         if(action==='delete'){
           closeSettings(actionButton);state.deleteId=id;
           const item=state.items.find(value=>value.id===id);
@@ -438,10 +523,13 @@
       const count=Number(form.elements.count.value);
       if(!name){form.elements.name.focus();return notify('Please enter an item name.')}
       if(!Number.isInteger(count)||count<0)return notify('Please enter a valid whole-number quantity.');
-      const previous={...item};
+      const previous={...item,logs:[...(item.logs||[])]};
+      const previousCount=item.count;
+      const now=new Date().toISOString();
       item.name=name;item.count=count;
       if(state.editPhotoTemp!==undefined)item.photo=state.editPhotoTemp||'';
-      item.updatedAt=new Date().toISOString();
+      item.updatedAt=now;
+      item.logs=[...(item.logs||[]),makeLog(previousCount,count,count===previousCount?'Saved item details':'Saved quantity change',now)];
       if(!save()){Object.assign(item,previous);return}
       state.expandedId=null;state.editPhotoTemp=undefined;render();notify('Item updated.')
     });
