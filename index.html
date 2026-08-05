@@ -2,9 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#151714">
+  <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#12bfd6">
   <title>Inventory Counter</title>
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Inventory">
   <style>
     :root{
       --ink:#171916;--muted:#73776e;--line:#dedfd9;--bg:#f4f4f1;--card:#fff;
@@ -12,15 +19,26 @@
       font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg)
     }
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg)}
+    html{touch-action:pan-x pan-y;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+    body{margin:0;background:var(--bg);overscroll-behavior:none}
     button,input{font:inherit}
     button{cursor:pointer}
     button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #c9ef7088;outline-offset:2px}
     .shell{width:min(100% - 24px,1040px);margin:auto;padding:28px 0 150px}
-    header{display:flex;justify-content:space-between;align-items:end;gap:16px;margin-bottom:22px}
-    h1{margin:0;font-size:clamp(30px,5vw,44px);letter-spacing:-.05em}
-    .summary,.note{margin:7px 0 0;color:var(--muted);font-size:13px}
-    .desktop-note{text-align:right}
+    .page-header{display:flex;justify-content:space-between;align-items:end;gap:16px;margin:0 2px 18px}
+    .header-copy{min-width:0}
+    h1{margin:0;font-size:clamp(28px,4vw,39px);letter-spacing:-.05em}
+    .summary,.note{margin:6px 0 0;color:var(--muted);font-size:13px}
+    .desktop-note{margin:0 0 4px;text-align:right}
+
+    .search-wrap{position:relative;margin:0 0 12px}
+    .search-wrap::before{content:'⌕';position:absolute;left:15px;top:50%;z-index:1;transform:translateY(-52%);color:var(--muted);font-size:23px;line-height:1;pointer-events:none}
+    .search-input{min-height:50px;padding:0 48px 0 46px;border-radius:14px;background:var(--card);box-shadow:0 1px 0 #17191605}
+    .search-input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+    .search-clear{position:absolute;right:8px;top:50%;display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:9px;transform:translateY(-50%);background:transparent;color:var(--muted);font-size:21px;line-height:1}
+    .search-clear:hover{background:#ecece8;color:var(--ink)}
+    .search-clear[hidden]{display:none}
+    .visually-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 
     .inventory{border:1px solid var(--line);border-radius:18px;background:var(--card);overflow:visible}
     .list-head,.inventory-row{
@@ -69,7 +87,7 @@
     .photo-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
     .edit-fields{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:13px;align-content:start}
     label{display:grid;gap:7px;color:var(--muted);font-size:12px;font-weight:680}
-    input{width:100%;min-height:45px;padding:0 13px;border:1px solid var(--line);border-radius:11px;background:#fff;outline:0;color:var(--ink)}
+    input{width:100%;min-height:45px;padding:0 13px;border:1px solid var(--line);border-radius:11px;background:#fff;outline:0;color:var(--ink);font-size:16px}
     input:focus{border-color:#778b43;box-shadow:0 0 0 3px #c9ef7055}
     .date-info{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:12px;border-radius:11px;background:#f4f4f1;color:var(--muted);font-size:12px;line-height:1.45}
     .date-info strong{display:block;color:var(--ink);font-size:12px}
@@ -99,10 +117,20 @@
     .btn:disabled{opacity:.5;cursor:not-allowed}
     .file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 
-    .fab-wrap{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));z-index:8;display:grid;justify-items:center;gap:5px;transform:translateX(-50%)}
+    .fab-wrap{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));z-index:8;display:grid;justify-items:center;gap:6px;transform:translateX(-50%)}
     .fab{display:grid;place-items:center;width:62px;height:62px;border:0;border-radius:50%;background:var(--ink);color:#fff;box-shadow:0 14px 34px #1719164d;font-size:37px;font-weight:300;line-height:1}
     .fab:hover{transform:translateY(-1px)}
-    .no-photo-add{padding:5px 10px;border:0;border-radius:99px;background:#f4f4f1e8;color:var(--ink);font-size:11px;font-weight:720;box-shadow:0 4px 16px #17191614;backdrop-filter:blur(8px)}
+    .fab-secondary{display:flex;justify-content:center;gap:6px;white-space:nowrap}
+    .fab-link{padding:6px 10px;border:0;border-radius:99px;background:#f4f4f1e8;color:var(--ink);font-size:11px;font-weight:720;box-shadow:0 4px 16px #17191614;backdrop-filter:blur(8px)}
+    .fab-link:disabled{opacity:.55;cursor:not-allowed}
+
+    .batch-dialog{width:min(94vw,760px)}
+    .batch-status{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 12px;color:var(--muted);font-size:12px}
+    .batch-list{display:grid;gap:9px;max-height:min(58vh,520px);overflow:auto;padding:1px 4px 1px 1px}
+    .batch-row{display:grid;grid-template-columns:92px minmax(0,1fr) 110px 36px;gap:10px;align-items:end;padding:10px;border:1px solid var(--line);border-radius:13px;background:#f8f8f4}
+    .batch-photo{width:92px;height:72px;border:1px solid var(--line);border-radius:10px;object-fit:cover;background:#ebebe6}
+    .batch-remove{display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--muted);font-size:20px}
+    .batch-remove:hover{background:#fbe8e6;color:var(--danger)}
 
     dialog{width:min(92vw,430px);padding:0;border:0;border-radius:18px;box-shadow:0 24px 80px #0003}
     dialog::backdrop{background:#17191688;backdrop-filter:blur(2px)}
@@ -119,7 +147,6 @@
 
     @media(max-width:760px){
       .shell{width:calc(100% - 20px);padding-top:19px}
-      header{align-items:start}
       .desktop-note{display:none}
       .list-head{display:none}
       .inventory-row{grid-template-columns:56px minmax(0,1fr) 180px 38px 38px;gap:9px;padding:10px}
@@ -135,7 +162,7 @@
       .photo-actions{grid-template-columns:1fr;align-self:center}
     }
     @media(max-width:520px){
-      h1{font-size:32px}
+      h1{font-size:30px}
       .inventory-row{grid-template-columns:50px minmax(0,1fr) 154px 34px 34px;gap:7px}
       .thumb{width:48px;height:48px}
       .icon-btn{width:34px;height:34px}
@@ -153,18 +180,29 @@
       .log-entry{grid-template-columns:1fr auto;gap:5px 10px}
       .log-action{grid-column:1}
       .log-time{grid-column:2;grid-row:2}
+      .fab-secondary{max-width:calc(100vw - 20px)}
+      .fab-link{font-size:10px;padding:6px 8px}
+      .batch-row{grid-template-columns:72px minmax(0,1fr) 88px 32px;gap:7px;padding:8px}
+      .batch-photo{width:72px;height:64px}
+      .batch-remove{width:32px;height:34px}
     }
   </style>
 </head>
 <body>
   <main class="shell">
-    <header>
-      <div>
-        <h1>Inventory</h1>
+    <header class="page-header" aria-labelledby="pageTitle">
+      <div class="header-copy">
+        <h1 id="pageTitle">Inventory</h1>
         <p class="summary" id="summary">0 item types · 0 total units</p>
       </div>
       <span class="note desktop-note">Stored in this browser</span>
     </header>
+
+    <div class="search-wrap" role="search">
+      <label class="visually-hidden" for="inventorySearch">Search inventory</label>
+      <input class="search-input" id="inventorySearch" type="search" placeholder="Search inventory" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <button class="search-clear" id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
+    </div>
 
     <section class="inventory" aria-label="Inventory list">
       <div class="list-head" aria-hidden="true">
@@ -176,10 +214,14 @@
 
   <div class="fab-wrap">
     <button class="fab" id="cameraAdd" type="button" aria-label="Add item with camera">+</button>
-    <button class="no-photo-add" id="noPhotoAdd" type="button">Add without photo</button>
+    <div class="fab-secondary">
+      <button class="fab-link" id="batchAlbumAdd" type="button">Batch add from album</button>
+      <button class="fab-link" id="noPhotoAdd" type="button">Add without photo</button>
+    </div>
   </div>
 
   <input class="file" id="quickPhoto" type="file" accept="image/*" capture="environment">
+  <input class="file" id="batchPhotoInput" type="file" accept="image/*" multiple>
   <input class="file" id="addPhotoInput" type="file" accept="image/*" capture="environment">
   <input class="file" id="editPhotoInput" type="file" accept="image/*" capture="environment">
 
@@ -203,6 +245,20 @@
     </form>
   </dialog>
 
+
+  <dialog class="batch-dialog" id="batchDialog">
+    <form class="modal" id="batchForm">
+      <h2>Batch Add from Album</h2>
+      <p>Each photo creates one inventory item. Item names are optional.</p>
+      <div class="batch-status"><span id="batchCount">0 photos selected</span><span>Default quantity: 1</span></div>
+      <div class="batch-list" id="batchItems"></div>
+      <div class="modal-actions">
+        <button class="btn soft" type="button" data-close="batchDialog">Cancel</button>
+        <button class="btn primary" id="saveBatch">Save All Items</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="deleteDialog">
     <form class="modal" id="deleteForm">
       <h2>Delete Item?</h2>
@@ -221,9 +277,11 @@
     const KEY='photo-inventory-counter-v1';
     const $=selector=>document.querySelector(selector);
     const els={
-      items:$('#items'),summary:$('#summary'),cameraAdd:$('#cameraAdd'),noPhotoAdd:$('#noPhotoAdd'),
-      quickPhoto:$('#quickPhoto'),addPhotoInput:$('#addPhotoInput'),editPhotoInput:$('#editPhotoInput'),
+      items:$('#items'),summary:$('#summary'),inventorySearch:$('#inventorySearch'),clearSearch:$('#clearSearch'),
+      cameraAdd:$('#cameraAdd'),batchAlbumAdd:$('#batchAlbumAdd'),noPhotoAdd:$('#noPhotoAdd'),
+      quickPhoto:$('#quickPhoto'),batchPhotoInput:$('#batchPhotoInput'),addPhotoInput:$('#addPhotoInput'),editPhotoInput:$('#editPhotoInput'),
       addDialog:$('#addDialog'),addForm:$('#addForm'),addPreview:$('#addPreview'),addName:$('#addName'),
+      batchDialog:$('#batchDialog'),batchForm:$('#batchForm'),batchItems:$('#batchItems'),batchCount:$('#batchCount'),saveBatch:$('#saveBatch'),
       addQuantity:$('#addQuantity'),changeAddPhoto:$('#changeAddPhoto'),removeAddPhoto:$('#removeAddPhoto'),
       saveAdd:$('#saveAdd'),deleteDialog:$('#deleteDialog'),deleteForm:$('#deleteForm'),
       deleteText:$('#deleteText'),toast:$('#toast')
@@ -236,7 +294,10 @@
       deleteId:null,
       addPhoto:'',
       editPhotoTemp:undefined,
-      pendingCounts:{}
+      batchDrafts:[],
+      batchProcessing:false,
+      pendingCounts:{},
+      searchQuery:''
     };
     let toastTimer;
 
@@ -295,7 +356,74 @@
       try{return new Intl.DateTimeFormat('en-CA',{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value))}
       catch{return 'Unknown'}
     }
-    function sortedItems(){return [...state.items].sort((a,b)=>Date.parse(b.updatedAt)-Date.parse(a.updatedAt))}
+    function normalizeSearch(value){
+      return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim()
+    }
+    function editDistance(a,b){
+      if(a===b)return 0;
+      if(!a.length)return b.length;
+      if(!b.length)return a.length;
+      let previous=Array.from({length:b.length+1},(_,index)=>index);
+      for(let i=1;i<=a.length;i++){
+        const current=[i];
+        for(let j=1;j<=b.length;j++){
+          const cost=a[i-1]===b[j-1]?0:1;
+          current[j]=Math.min(current[j-1]+1,previous[j]+1,previous[j-1]+cost)
+        }
+        previous=current
+      }
+      return previous[b.length]
+    }
+    function subsequenceScore(query,text){
+      let queryIndex=0,lastIndex=-1,gaps=0;
+      for(let index=0;index<text.length&&queryIndex<query.length;index++){
+        if(text[index]===query[queryIndex]){
+          if(lastIndex>=0)gaps+=index-lastIndex-1;
+          lastIndex=index;queryIndex++
+        }
+      }
+      return queryIndex===query.length?gaps+(text.length-query.length)*.1:Infinity
+    }
+    function tokenScore(queryToken,nameTokens){
+      let best=Infinity;
+      for(const token of nameTokens){
+        if(token===queryToken)best=Math.min(best,0);
+        else if(token.startsWith(queryToken))best=Math.min(best,2+(token.length-queryToken.length)*.1);
+        else if(token.includes(queryToken))best=Math.min(best,5+token.indexOf(queryToken));
+        else if(queryToken.length>=3){
+          const distance=editDistance(queryToken,token);
+          const tolerance=queryToken.length<=4?1:Math.max(1,Math.floor(queryToken.length*.3));
+          if(distance<=tolerance)best=Math.min(best,12+distance*3+Math.abs(token.length-queryToken.length));
+          const sequence=subsequenceScore(queryToken,token);
+          if(Number.isFinite(sequence))best=Math.min(best,18+sequence)
+        }
+      }
+      return best
+    }
+    function fuzzyScore(item,query){
+      const name=normalizeSearch(item.name);
+      if(!query)return 0;
+      if(name===query)return 0;
+      if(name.startsWith(query))return 1+(name.length-query.length)*.01;
+      const directIndex=name.indexOf(query);
+      if(directIndex>=0)return 3+directIndex+(name.length-query.length)*.01;
+      const queryTokens=query.split(/\s+/).filter(Boolean);
+      const nameTokens=name.split(/[^a-z0-9]+/).filter(Boolean);
+      let total=0;
+      for(const queryToken of queryTokens){
+        const score=tokenScore(queryToken,nameTokens);
+        if(!Number.isFinite(score))return Infinity;
+        total+=score
+      }
+      return 10+total
+    }
+    function visibleItems(){
+      const query=normalizeSearch(state.searchQuery);
+      return state.items.map(item=>({item,score:fuzzyScore(item,query)}))
+        .filter(result=>Number.isFinite(result.score))
+        .sort((a,b)=>a.score-b.score||Date.parse(b.item.updatedAt)-Date.parse(a.item.updatedAt))
+        .map(result=>result.item)
+    }
     function notify(message){
       els.toast.textContent=message;els.toast.classList.add('show');clearTimeout(toastTimer);
       toastTimer=setTimeout(()=>els.toast.classList.remove('show'),1900)
@@ -317,11 +445,17 @@
     function render(){
       const total=state.items.reduce((sum,item)=>sum+item.count,0);
       els.summary.textContent=`${state.items.length} item type${state.items.length===1?'':'s'} · ${total} total unit${total===1?'':'s'}`;
+      els.clearSearch.hidden=!state.searchQuery;
       if(!state.items.length){
         els.items.innerHTML='<div class="empty-state"><strong>No inventory yet</strong>Use the + button to photograph your first item, or add one without a photo.</div>';
         return;
       }
-      els.items.innerHTML=sortedItems().map(renderItem).join('')
+      const visible=visibleItems();
+      if(!visible.length){
+        els.items.innerHTML=`<div class="empty-state"><strong>No matching items</strong>Try a different spelling or clear the search.</div>`;
+        return
+      }
+      els.items.innerHTML=visible.map(renderItem).join('')
     }
 
     function renderItem(item){
@@ -446,6 +580,36 @@
       els.addPreview=$('#addPreview');
       els.removeAddPhoto.disabled=!state.addPhoto
     }
+
+    function renderBatchDrafts(){
+      els.batchCount.textContent=`${state.batchDrafts.length} photo${state.batchDrafts.length===1?'':'s'} selected`;
+      els.saveBatch.disabled=!state.batchDrafts.length||state.batchProcessing;
+      els.batchItems.innerHTML=state.batchDrafts.map((draft,index)=>`<div class="batch-row" data-batch-id="${draft.id}">
+        <img class="batch-photo" src="${draft.photo}" alt="Selected photo ${index+1}">
+        <label>Item Name <span class="visually-hidden">optional</span><input data-batch-name maxlength="60" value="${esc(draft.name||'')}" placeholder="Optional — defaults to Untitled Item" autocomplete="off"></label>
+        <label>Quantity<input data-batch-count type="number" min="0" max="999999" step="1" value="${Number.isInteger(draft.count)?draft.count:1}" inputmode="numeric" required></label>
+        <button class="batch-remove" type="button" data-batch-remove aria-label="Remove selected photo ${index+1}">×</button>
+      </div>`).join('')
+    }
+    async function openBatch(files){
+      const imageFiles=Array.from(files||[]).filter(file=>file.type.startsWith('image/'));
+      if(!imageFiles.length){notify('Please select one or more image files.');return}
+      state.batchProcessing=true;els.batchAlbumAdd.disabled=true;
+      const drafts=[];
+      try{
+        for(let index=0;index<imageFiles.length;index++){
+          notify(`Processing photo ${index+1} of ${imageFiles.length}…`);
+          try{drafts.push({id:makeId(),photo:await compress(imageFiles[index]),name:'',count:1})}
+          catch{}
+        }
+      }finally{
+        state.batchProcessing=false;els.batchAlbumAdd.disabled=false
+      }
+      if(!drafts.length){notify('Unable to process the selected photos.');return}
+      state.batchDrafts=drafts;
+      renderBatchDrafts();
+      els.batchDialog.showModal()
+    }
     function openAdd(photo=''){
       state.addPhoto=photo;
       els.addForm.reset();
@@ -473,13 +637,65 @@
     }
     function closeSettings(target){const details=target.closest('details');if(details)details.open=false}
 
+    els.inventorySearch.addEventListener('input',event=>{state.searchQuery=event.target.value;render()});
+    els.clearSearch.addEventListener('click',()=>{state.searchQuery='';els.inventorySearch.value='';render();els.inventorySearch.focus()});
+
     els.cameraAdd.addEventListener('click',()=>els.quickPhoto.click());
+    els.batchAlbumAdd.addEventListener('click',()=>els.batchPhotoInput.click());
     els.noPhotoAdd.addEventListener('click',()=>openAdd(''));
     els.quickPhoto.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'quick');event.target.value='' });
+    els.batchPhotoInput.addEventListener('change',async event=>{await openBatch(event.target.files);event.target.value='' });
     els.addPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'add');event.target.value='' });
     els.editPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'edit');event.target.value='' });
     els.changeAddPhoto.addEventListener('click',()=>els.addPhotoInput.click());
     els.removeAddPhoto.addEventListener('click',()=>{state.addPhoto='';setAddPreview()});
+
+
+    els.batchItems.addEventListener('input',event=>{
+      const row=event.target.closest('[data-batch-id]');
+      if(!row)return;
+      const draft=state.batchDrafts.find(value=>value.id===row.dataset.batchId);
+      if(!draft)return;
+      if(event.target.matches('[data-batch-name]'))draft.name=event.target.value;
+      if(event.target.matches('[data-batch-count]'))draft.count=Number(event.target.value)
+    });
+
+    els.batchItems.addEventListener('click',event=>{
+      const remove=event.target.closest('[data-batch-remove]');
+      if(!remove)return;
+      const row=remove.closest('[data-batch-id]');
+      state.batchDrafts=state.batchDrafts.filter(draft=>draft.id!==row.dataset.batchId);
+      renderBatchDrafts();
+      if(!state.batchDrafts.length)els.batchDialog.close()
+    });
+
+    els.batchForm.addEventListener('submit',event=>{
+      event.preventDefault();
+      const rows=Array.from(els.batchItems.querySelectorAll('[data-batch-id]'));
+      if(!rows.length)return notify('No photos remain in this batch.');
+      const now=Date.now();
+      const created=[];
+      for(let index=0;index<rows.length;index++){
+        const row=rows[index];
+        const draft=state.batchDrafts.find(value=>value.id===row.dataset.batchId);
+        if(!draft)continue;
+        const name=row.querySelector('[data-batch-name]').value.trim()||'Untitled Item';
+        const count=Number(row.querySelector('[data-batch-count]').value);
+        if(!Number.isInteger(count)||count<0||count>999999){
+          row.querySelector('[data-batch-count]').focus();
+          return notify('Each quantity must be a valid whole number.')
+        }
+        const at=new Date(now+index).toISOString();
+        created.push({id:makeId(),name,count,photo:draft.photo,createdAt:at,updatedAt:at,logs:[makeLog(0,count,'Item created by batch import',at)]})
+      }
+      if(!created.length)return notify('No items were created.');
+      state.items.push(...created);
+      if(!save()){
+        state.items.splice(state.items.length-created.length,created.length);
+        return
+      }
+      state.batchDrafts=[];els.batchDialog.close();render();notify(`${created.length} item${created.length===1?'':'s'} added.`)
+    });
 
     els.addForm.addEventListener('submit',event=>{
       event.preventDefault();
@@ -582,8 +798,29 @@
       if(dialogId)document.getElementById(dialogId).close();
       if(!event.target.closest('.settings'))document.querySelectorAll('.settings[open]').forEach(menu=>menu.open=false)
     });
-    [els.addDialog,els.deleteDialog].forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
+    [els.addDialog,els.batchDialog,els.deleteDialog].forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
     els.addDialog.addEventListener('close',()=>{state.addPhoto=''});
+    els.batchDialog.addEventListener('close',()=>{state.batchDrafts=[];els.batchItems.innerHTML=''});
+
+    // Lock page zoom while preserving ordinary one-finger scrolling.
+    ['gesturestart','gesturechange','gestureend'].forEach(type=>{
+      document.addEventListener(type,event=>event.preventDefault(),{passive:false})
+    });
+    document.addEventListener('touchmove',event=>{
+      if(event.touches&&event.touches.length>1)event.preventDefault()
+    },{passive:false});
+    let lastTouchEnd=0;
+    document.addEventListener('touchend',event=>{
+      const now=Date.now();
+      if(now-lastTouchEnd<=300)event.preventDefault();
+      lastTouchEnd=now
+    },{passive:false});
+    document.addEventListener('wheel',event=>{
+      if(event.ctrlKey||event.metaKey)event.preventDefault()
+    },{passive:false});
+    document.addEventListener('keydown',event=>{
+      if((event.ctrlKey||event.metaKey)&&['+','=','-','0'].includes(event.key))event.preventDefault()
+    });
 
     render();
   })();
