@@ -380,6 +380,33 @@
     body.zones-open .fab-wrap{display:grid}
     .fab-secondary{display:none}
     .fab{width:58px;height:58px}
+    .quick-dock{
+      position:fixed;left:50%;bottom:calc(12px + env(safe-area-inset-bottom));z-index:18;
+      display:grid!important;grid-template-columns:repeat(4,minmax(64px,1fr));align-items:stretch;
+      width:min(calc(100% - 24px),520px);padding:7px;gap:3px;transform:translateX(-50%);
+      border:1px solid rgba(255,255,255,.74);border-radius:24px;
+      background:linear-gradient(145deg,rgba(255,255,255,.74),rgba(229,234,227,.62));
+      box-shadow:0 16px 42px rgba(23,25,22,.18),inset 0 1px 0 rgba(255,255,255,.9),inset 0 -1px 0 rgba(255,255,255,.25);
+      -webkit-backdrop-filter:blur(26px) saturate(185%);backdrop-filter:blur(26px) saturate(185%);
+      isolation:isolate;overflow:hidden;
+    }
+    body.zones-open .quick-dock{display:grid!important}
+    .quick-dock::before{
+      content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;
+      background:radial-gradient(circle at 18% 0,rgba(255,255,255,.86),transparent 34%),radial-gradient(circle at 82% 110%,rgba(116,216,226,.16),transparent 38%);
+    }
+    .dock-action{
+      min-width:0;min-height:56px;padding:6px 4px;border:0;border-radius:17px;background:transparent;color:#454944;
+      display:grid;place-items:center;align-content:center;gap:3px;font:inherit;font-size:10px;font-weight:790;line-height:1.05;
+      letter-spacing:-.01em;white-space:nowrap;touch-action:manipulation;transition:transform .12s ease,background .15s ease,box-shadow .15s ease;
+    }
+    .dock-action:hover{background:rgba(255,255,255,.48)}
+    .dock-action:active{transform:scale(.95);background:rgba(255,255,255,.68)}
+    .dock-action:focus-visible{outline:3px solid rgba(18,191,214,.32);outline-offset:-2px}
+    .dock-icon{display:grid;place-items:center;height:24px;font-size:22px;font-weight:450;line-height:1}
+    .dock-primary{background:rgba(23,25,22,.93);color:#fff;box-shadow:0 5px 14px rgba(23,25,22,.23),inset 0 1px 0 rgba(255,255,255,.18)}
+    .dock-primary:hover{background:rgba(23,25,22,.97)}
+    .dock-primary:active{background:#171916}
     @media(max-width:760px){
       .shell{width:calc(100% - 16px);padding-top:14px}
       .toolbar{grid-template-columns:1fr auto;top:0}
@@ -415,9 +442,11 @@
       .zone-quick-count{grid-template-columns:46px minmax(60px,1fr) 46px}
       .zone-step{width:46px;height:44px}
       .zone-save-state{text-align:center}
+      .quick-dock{width:calc(100% - 16px);bottom:calc(8px + env(safe-area-inset-bottom));padding:6px;border-radius:22px}
+      .dock-action{min-height:54px;font-size:9px}
     }
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important}}
-    @media(prefers-reduced-transparency:reduce){.toolbar{background:#f6f7f3;backdrop-filter:none}}
+    @media(prefers-reduced-transparency:reduce){.toolbar{background:#f6f7f3;backdrop-filter:none}.quick-dock{background:#f1f3ee;-webkit-backdrop-filter:none;backdrop-filter:none}}
 
     /* Zone-owned information architecture. */
     select{width:100%;min-height:45px;padding:0 38px 0 13px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink);font:inherit;font-size:16px}
@@ -504,13 +533,16 @@
     </section>
   </main>
 
-  <div class="fab-wrap">
-    <button class="fab" id="cameraAdd" type="button" aria-label="Add item">+</button>
-    <div class="fab-secondary">
+  <nav class="fab-wrap quick-dock" aria-label="Quick actions">
+    <button class="dock-action" id="dockExpandZones" type="button" aria-label="Open all zones"><span class="dock-icon" aria-hidden="true">⌄</span><span>Open all</span></button>
+    <button class="dock-action dock-primary" id="cameraAdd" type="button" aria-label="Add item"><span class="dock-icon" aria-hidden="true">+</span><span>Add item</span></button>
+    <button class="dock-action" id="dockCollapseZones" type="button" aria-label="Close all zones"><span class="dock-icon" aria-hidden="true">⌃</span><span>Close all</span></button>
+    <button class="dock-action" id="dockAddZone" type="button" aria-label="Add zone"><span class="dock-icon" aria-hidden="true">＋</span><span>Add zone</span></button>
+    <div class="fab-secondary" hidden>
       <button class="fab-link" id="batchAlbumAdd" type="button">Batch add from album</button>
       <button class="fab-link" id="noPhotoAdd" type="button">Add without photo</button>
     </div>
-  </div>
+  </nav>
 
   <input class="file" id="batchPhotoInput" type="file" accept="image/*" multiple>
   <input class="file" id="addPhotoInput" type="file" accept="image/*">
@@ -622,7 +654,7 @@
       items:$('#items'),summary:$('#summary'),metricRestock:$('#metricRestock'),metricRestockDetail:$('#metricRestockDetail'),
       metricLow:$('#metricLow'),metricLowDetail:$('#metricLowDetail'),metricStock:$('#metricStock'),metricStockDetail:$('#metricStockDetail'),
       filterRestockCount:$('#filterRestockCount'),filterAllCount:$('#filterAllCount'),filterFullCount:$('#filterFullCount'),
-      inventorySearch:$('#inventorySearch'),clearSearch:$('#clearSearch'),cameraAdd:$('#cameraAdd'),batchAlbumAdd:$('#batchAlbumAdd'),noPhotoAdd:$('#noPhotoAdd'),
+      inventorySearch:$('#inventorySearch'),clearSearch:$('#clearSearch'),cameraAdd:$('#cameraAdd'),batchAlbumAdd:$('#batchAlbumAdd'),noPhotoAdd:$('#noPhotoAdd'),dockExpandZones:$('#dockExpandZones'),dockCollapseZones:$('#dockCollapseZones'),dockAddZone:$('#dockAddZone'),
       toggleZones:$('#toggleZones'),zoneCount:$('#zoneCount'),addZone:$('#addZone'),addZoneInside:$('#addZoneInside'),zoneManager:$('#zoneManager'),zoneList:$('#zoneList'),expandAllZones:$('#expandAllZones'),collapseAllZones:$('#collapseAllZones'),
       batchPhotoInput:$('#batchPhotoInput'),addPhotoInput:$('#addPhotoInput'),editPhotoInput:$('#editPhotoInput'),
       addDialog:$('#addDialog'),addForm:$('#addForm'),addPreview:$('#addPreview'),addName:$('#addName'),addItemZone:$('#addItemZone'),addCategory:$('#addCategory'),categorySuggestions:$('#categorySuggestions'),addOnSite:$('#addOnSite'),
@@ -642,6 +674,7 @@
     };
     let db=null;
     let toastTimer;
+    let collapsedSavePromise=Promise.resolve();
     const zoneSaveTimers=new Map();
     const zoneSaveTokens=new Map();
     const zoneSavePromises=new Map();
@@ -764,6 +797,17 @@
       tx.objectStore(META_STORE).put({key,value,updatedAt:new Date().toISOString()});
       await transactionPromise(tx)
     }
+    async function loadCollapsedZones(){
+      const saved=await getMeta('collapsedZonesV1').catch(()=>null),validIds=new Set(state.zones.map(zone=>zone.id));
+      state.collapsedZones=new Set((Array.isArray(saved&&saved.value)?saved.value:[]).filter(id=>validIds.has(id)))
+    }
+    function persistCollapsedZones(){
+      const validIds=new Set(state.zones.map(zone=>zone.id)),snapshot=[...state.collapsedZones].filter(id=>validIds.has(id));
+      collapsedSavePromise=collapsedSavePromise.catch(()=>{}).then(()=>putMeta('collapsedZonesV1',snapshot)).catch(storageFailure);
+      return collapsedSavePromise
+    }
+    function openAllZones(){state.collapsedZones.clear();renderZones();persistCollapsedZones()}
+    function closeAllZones(){state.zones.forEach(zone=>state.collapsedZones.add(zone.id));renderZones();persistCollapsedZones()}
     async function getAllStoredItems(){
       const tx=db.transaction(ITEMS_STORE,'readonly');
       const records=await requestPromise(tx.objectStore(ITEMS_STORE).getAll());
@@ -1108,9 +1152,9 @@
     }
 
     els.toggleZones.addEventListener('click',()=>{state.zonesVisible=!state.zonesVisible;render();if(state.zonesVisible)setTimeout(()=>els.zoneManager.scrollIntoView({behavior:'smooth',block:'start'}),20)});
-    [els.addZone,els.addZoneInside].forEach(button=>button.addEventListener('click',()=>openZoneDialog(null)));
-    els.expandAllZones.addEventListener('click',()=>{state.collapsedZones.clear();renderZones()});
-    els.collapseAllZones.addEventListener('click',()=>{state.zones.forEach(zone=>state.collapsedZones.add(zone.id));renderZones()});
+    [els.addZone,els.addZoneInside,els.dockAddZone].forEach(button=>button.addEventListener('click',()=>openZoneDialog(null)));
+    [els.expandAllZones,els.dockExpandZones].forEach(button=>button.addEventListener('click',openAllZones));
+    [els.collapseAllZones,els.dockCollapseZones].forEach(button=>button.addEventListener('click',closeAllZones));
     els.zoneItemSearch.addEventListener('input',event=>{state.zoneItemQuery=event.target.value;renderZonePicker()});
     els.zoneItemPicker.addEventListener('change',event=>{if(!event.target.matches('[data-zone-pick]'))return;if(event.target.checked)state.zoneDraftItemIds.add(event.target.value);else state.zoneDraftItemIds.delete(event.target.value)});
     els.zoneSelectAll.addEventListener('click',()=>{zonePickerItems().forEach(item=>state.zoneDraftItemIds.add(item.id));renderZonePicker()});
@@ -1123,7 +1167,7 @@
     });
     els.zoneList.addEventListener('click',async event=>{
       const button=event.target.closest('[data-zone-action]');if(!button)return;const card=button.closest('[data-zone-id]'),zone=card&&state.zones.find(value=>value.id===card.dataset.zoneId),action=button.dataset.zoneAction;
-      if(action==='toggle'&&zone){if(state.collapsedZones.has(zone.id))state.collapsedZones.delete(zone.id);else state.collapsedZones.add(zone.id);renderZones();return}
+      if(action==='toggle'&&zone){if(state.collapsedZones.has(zone.id))state.collapsedZones.delete(zone.id);else state.collapsedZones.add(zone.id);renderZones();persistCollapsedZones();return}
       if(action==='edit'&&zone){openZoneDialog(zone);return}
       if(action==='add-item'&&zone){openAdd(null,zone.id);return}
       if(action==='delete'&&zone){const count=state.items.filter(item=>item.zoneId===zone.id).length;state.zoneDeleteId=zone.id;els.deleteZoneText.textContent=`“${zone.name}” will be deleted. Its ${count} item${count===1?'':'s'} will move to Unassigned with photos and history intact.`;els.deleteZoneDialog.showModal();return}
@@ -1137,7 +1181,7 @@
       if(action==='view'){state.filter='all';state.searchQuery='';els.inventorySearch.value='';document.querySelectorAll('[data-filter]').forEach(filter=>filter.classList.toggle('active',filter.dataset.filter==='all'));state.expandedId=item.id;closeEditTemp();render();return}
       if(action==='restock'){const amount=shortage(item);if(amount<=0)return;button.disabled=true;if(await commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:item.targetQty},`Restocked +${amount}`,{restocked:true})){delete state.pendingOnSite[item.id];render();notify(`${item.name} restocked by ${amount}.`)}else button.disabled=false}
     });
-    els.deleteZoneForm.addEventListener('submit',async event=>{event.preventDefault();const index=state.zones.findIndex(zone=>zone.id===state.zoneDeleteId);if(index<0)return;const zone=state.zones[index],submit=els.deleteZoneForm.querySelector('.danger');submit.disabled=true;try{const affected=state.items.filter(item=>item.zoneId===zone.id);let unassigned=state.zones.find(value=>value.id!==zone.id&&value.name.toLowerCase()==='unassigned');if(affected.length&&!unassigned){const now=new Date().toISOString();unassigned={id:makeId(),name:'Unassigned',itemIds:[],createdAt:now,updatedAt:now};state.zones.push(unassigned);await putZone(unassigned)}affected.forEach(item=>{item.zoneId=unassigned.id;unassigned.itemIds.push(item.id)});if(affected.length){unassigned.itemIds=[...new Set(unassigned.itemIds)];unassigned.updatedAt=new Date().toISOString();await putItems(affected);await putZone(unassigned)}await removeStoredZone(zone.id);state.zones.splice(state.zones.indexOf(zone),1);state.collapsedZones.delete(zone.id);state.zoneDeleteId=null;els.deleteZoneDialog.close();render();notify(`Deleted ${zone.name}. ${affected.length?`${affected.length} item${affected.length===1?'':'s'} moved to Unassigned.`:'No items were affected.'}`)}catch(error){storageFailure(error)}finally{submit.disabled=false}});
+    els.deleteZoneForm.addEventListener('submit',async event=>{event.preventDefault();const index=state.zones.findIndex(zone=>zone.id===state.zoneDeleteId);if(index<0)return;const zone=state.zones[index],submit=els.deleteZoneForm.querySelector('.danger');submit.disabled=true;try{const affected=state.items.filter(item=>item.zoneId===zone.id);let unassigned=state.zones.find(value=>value.id!==zone.id&&value.name.toLowerCase()==='unassigned');if(affected.length&&!unassigned){const now=new Date().toISOString();unassigned={id:makeId(),name:'Unassigned',itemIds:[],createdAt:now,updatedAt:now};state.zones.push(unassigned);await putZone(unassigned)}affected.forEach(item=>{item.zoneId=unassigned.id;unassigned.itemIds.push(item.id)});if(affected.length){unassigned.itemIds=[...new Set(unassigned.itemIds)];unassigned.updatedAt=new Date().toISOString();await putItems(affected);await putZone(unassigned)}await removeStoredZone(zone.id);state.zones.splice(state.zones.indexOf(zone),1);state.collapsedZones.delete(zone.id);persistCollapsedZones();state.zoneDeleteId=null;els.deleteZoneDialog.close();render();notify(`Deleted ${zone.name}. ${affected.length?`${affected.length} item${affected.length===1?'':'s'} moved to Unassigned.`:'No items were affected.'}`)}catch(error){storageFailure(error)}finally{submit.disabled=false}});
 
     els.moveForm.addEventListener('submit',async event=>{
       event.preventDefault();const item=state.items.find(value=>value.id===state.moveItemId),destination=state.zones.find(zone=>zone.id===els.moveZone.value),source=item&&state.zones.find(zone=>zone.id===item.zoneId);if(!item||!destination||!source||source.id===destination.id)return notify('Please choose another zone.');
@@ -1281,6 +1325,7 @@
       state.items=await loadItems();
       state.zones=await loadZones();
       await migrateZoneOwnership();
+      await loadCollapsedZones();
       state.ready=true;
       const persistent=await requestPersistentStorage();
       if(els.storageNote)els.storageNote.textContent=persistent?'IndexedDB · persistent automatic history':'IndexedDB · automatic history';
