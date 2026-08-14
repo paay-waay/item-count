@@ -352,7 +352,7 @@
     .zone-card-header{padding:9px 10px}
     .zone-title strong{font-size:14px}
     .zone-title span{font-size:10px}
-    .zone-card-actions .btn{display:none}
+    .zone-card-actions .btn{display:inline-flex;align-items:center;min-height:32px;padding:0 8px;font-size:10px}
     .zone-item-row{grid-template-columns:46px minmax(120px,1fr) minmax(184px,220px) auto;gap:9px;min-height:68px;padding:9px 10px}
     .zone-current,.zone-full,.zone-missing,.zone-confirm{display:none}
     .zone-quick-count{display:grid;grid-template-columns:44px minmax(54px,1fr) 44px;gap:5px;align-items:center}
@@ -408,6 +408,25 @@
     }
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important}}
     @media(prefers-reduced-transparency:reduce){.toolbar{background:#f6f7f3;backdrop-filter:none}}
+
+    /* Zone-owned information architecture. */
+    select{width:100%;min-height:45px;padding:0 38px 0 13px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink);font:inherit;font-size:16px}
+    select:focus{border-color:#4ba6b3;box-shadow:0 0 0 3px #12bfd62e;outline:0}
+    .modal-grid{grid-template-columns:1fr 1fr}
+    .modal-grid label:nth-of-type(3){grid-column:1/-1}
+    .zone-select-toolbar,.zone-item-picker{display:none!important}
+    .zone-category{padding:7px 10px 3px;color:var(--muted);font-size:10px;font-weight:850;letter-spacing:.065em;text-transform:uppercase;background:#f8f8f5}
+    .zone-category:first-child{padding-top:10px}
+    .zone-empty .btn{margin-top:12px}
+    .inventory{border:0;background:transparent;margin:0;height:0;overflow:visible}
+    .inventory::before,.inventory .list-head,.inventory .empty-state{display:none}
+    .inventory .item-record:not(.expanded){display:none}
+    .zone-item-name span::first-letter{text-transform:uppercase}
+    @media(max-width:520px){
+      .modal-grid{grid-template-columns:1fr}
+      .modal-grid label:nth-of-type(3){grid-column:auto}
+      .zone-category{padding-left:9px}
+    }
   </style>
 </head>
 <body>
@@ -445,8 +464,8 @@
         <button class="search-clear" id="clearSearch" type="button" aria-label="Clear search" hidden>×</button>
       </div>
       <nav class="filters" aria-label="Inventory filters">
-        <button class="filter-btn active" type="button" data-filter="restock">Needs attention <span class="filter-count" id="filterRestockCount">0</span></button>
-        <button class="filter-btn" type="button" data-filter="all">All <span class="filter-count" id="filterAllCount">0</span></button>
+        <button class="filter-btn" type="button" data-filter="restock">Needs attention <span class="filter-count" id="filterRestockCount">0</span></button>
+        <button class="filter-btn active" type="button" data-filter="all">All <span class="filter-count" id="filterAllCount">0</span></button>
         <button class="filter-btn" type="button" data-filter="full">Fully Stocked <span class="filter-count" id="filterFullCount">0</span></button>
       </nav>
       <div class="zone-actions">
@@ -457,7 +476,7 @@
 
     <section class="zone-manager" id="zoneManager" aria-label="Zone management" hidden>
       <header class="zone-manager-head">
-        <div><h2>Zone Management</h2><p>Group existing inventory items without changing or duplicating their stock data.</p></div>
+        <div><h2>Zones</h2><p>Every item belongs to one zone and one category.</p></div>
         <div class="zone-manager-actions">
           <button class="btn soft small" id="expandAllZones" type="button">Expand all</button>
           <button class="btn soft small" id="collapseAllZones" type="button">Collapse all</button>
@@ -476,7 +495,7 @@
   </main>
 
   <div class="fab-wrap">
-    <button class="fab" id="cameraAdd" type="button" aria-label="Add item with camera">+</button>
+    <button class="fab" id="cameraAdd" type="button" aria-label="Add item">+</button>
     <div class="fab-secondary">
       <button class="fab-link" id="batchAlbumAdd" type="button">Batch add from album</button>
       <button class="fab-link" id="noPhotoAdd" type="button">Add without photo</button>
@@ -490,17 +509,19 @@
 
   <dialog id="addDialog">
     <form class="modal" id="addForm">
-      <h2>Add Floor Item</h2>
-      <p>Full stock is how many should be on-site after replenishment. Current on-site is how many are there now.</p>
+      <h2>Add Item</h2>
+      <p>Choose exactly where this item belongs. It will only appear inside that zone and category.</p>
       <div id="addPreview" class="add-preview empty">No photo selected</div>
       <div class="modal-photo-actions">
         <button class="btn soft small" type="button" id="changeAddPhoto">Take / Choose Photo</button>
         <button class="btn soft small" type="button" id="removeAddPhoto">Remove Photo</button>
       </div>
       <div class="modal-grid">
+        <label>Zone<select id="addItemZone" required></select></label>
+        <label>Category<input id="addCategory" maxlength="40" list="categorySuggestions" placeholder="e.g. Plush Toys" autocomplete="off" required></label>
+        <datalist id="categorySuggestions"></datalist>
         <label>Item Name<input id="addName" maxlength="60" placeholder="e.g. Bashful Bunny" autocomplete="off" required></label>
-        <label>Full Stock<input id="addTarget" type="number" min="0" max="999999" step="1" value="1" inputmode="numeric" required></label>
-        <label>Current On-site<input id="addOnSite" type="number" min="0" max="999999" step="1" value="1" inputmode="numeric" required></label>
+        <label>Quantity<input id="addOnSite" type="number" min="0" max="999999" step="1" value="1" inputmode="numeric" required></label>
       </div>
       <div class="modal-actions">
         <button class="btn soft" type="button" data-close="addDialog">Cancel</button>
@@ -525,7 +546,7 @@
   <dialog class="zone-dialog" id="zoneDialog">
     <form class="modal" id="zoneForm">
       <h2 id="zoneDialogTitle">Add Zone</h2>
-      <p>Name the zone, then select any existing inventory items. Removing a zone never deletes its items.</p>
+      <p>Name the zone. Items are added directly inside a zone and belong to one zone only.</p>
       <label>Zone Name<input id="zoneName" maxlength="60" placeholder="e.g. Front Wall" autocomplete="off" required></label>
       <div class="zone-select-toolbar">
         <input class="zone-search" id="zoneItemSearch" type="search" placeholder="Search inventory" autocomplete="off" spellcheck="false">
@@ -583,7 +604,7 @@
       inventorySearch:$('#inventorySearch'),clearSearch:$('#clearSearch'),cameraAdd:$('#cameraAdd'),batchAlbumAdd:$('#batchAlbumAdd'),noPhotoAdd:$('#noPhotoAdd'),
       toggleZones:$('#toggleZones'),zoneCount:$('#zoneCount'),addZone:$('#addZone'),addZoneInside:$('#addZoneInside'),zoneManager:$('#zoneManager'),zoneList:$('#zoneList'),expandAllZones:$('#expandAllZones'),collapseAllZones:$('#collapseAllZones'),
       quickPhoto:$('#quickPhoto'),batchPhotoInput:$('#batchPhotoInput'),addPhotoInput:$('#addPhotoInput'),editPhotoInput:$('#editPhotoInput'),
-      addDialog:$('#addDialog'),addForm:$('#addForm'),addPreview:$('#addPreview'),addName:$('#addName'),addTarget:$('#addTarget'),addOnSite:$('#addOnSite'),
+      addDialog:$('#addDialog'),addForm:$('#addForm'),addPreview:$('#addPreview'),addName:$('#addName'),addItemZone:$('#addItemZone'),addCategory:$('#addCategory'),categorySuggestions:$('#categorySuggestions'),addOnSite:$('#addOnSite'),
       changeAddPhoto:$('#changeAddPhoto'),removeAddPhoto:$('#removeAddPhoto'),saveAdd:$('#saveAdd'),
       batchDialog:$('#batchDialog'),batchForm:$('#batchForm'),batchItems:$('#batchItems'),batchCount:$('#batchCount'),saveBatch:$('#saveBatch'),
       zoneDialog:$('#zoneDialog'),zoneForm:$('#zoneForm'),zoneDialogTitle:$('#zoneDialogTitle'),zoneName:$('#zoneName'),zoneItemSearch:$('#zoneItemSearch'),zoneItemPicker:$('#zoneItemPicker'),zoneSelectAll:$('#zoneSelectAll'),zoneClearAll:$('#zoneClearAll'),saveZone:$('#saveZone'),
@@ -593,8 +614,8 @@
 
     const state={
       items:[],expandedId:null,deleteId:null,addPhoto:null,editPhotoTemp:undefined,
-      batchDrafts:[],batchProcessing:false,pendingOnSite:{},searchQuery:'',filter:'restock',addOnSiteTouched:false,
-      zones:[],zonesVisible:true,zoneEditId:null,zoneDeleteId:null,zoneDraftItemIds:new Set(),zoneItemQuery:'',collapsedZones:new Set(),
+      batchDrafts:[],batchProcessing:false,pendingOnSite:{},searchQuery:'',filter:'all',
+      zones:[],zonesVisible:true,zoneEditId:null,zoneDeleteId:null,zoneDraftItemIds:new Set(),zoneItemQuery:'',collapsedZones:new Set(),pendingAddAfterZone:false,
       ready:false
     };
     let db=null;
@@ -662,7 +683,8 @@
       const logs=Array.isArray(record&&record.logs)?record.logs.map((log,logIndex)=>normalizeLog(log,targetQty,logIndex)).filter(Boolean):[];
       const photoBlob=record&&record.photoBlob instanceof Blob?record.photoBlob:dataUrlToBlob(record&&record.photo);
       const item={
-        id:record&&record.id||makeId(),name:String(record&&record.name||'Untitled Item'),targetQty,onSiteQty,
+        id:record&&record.id||makeId(),name:String(record&&record.name||'Untitled Item'),
+        zoneId:typeof (record&&record.zoneId)==='string'?record.zoneId:'',category:String(record&&record.category||'General').trim()||'General',targetQty,onSiteQty,
         createdAt,updatedAt,lastRestockedAt:validDate(record&&record.lastRestockedAt)?record.lastRestockedAt:'',
         photoBlob:photoBlob||null,photo:objectUrl(photoBlob),logs
       };
@@ -671,7 +693,7 @@
     }
     function serializeItem(item){
       return{
-        id:item.id,name:item.name,targetQty:item.targetQty,onSiteQty:item.onSiteQty,createdAt:item.createdAt,updatedAt:item.updatedAt,
+        id:item.id,name:item.name,zoneId:item.zoneId||'',category:item.category||'General',targetQty:item.targetQty,onSiteQty:item.onSiteQty,createdAt:item.createdAt,updatedAt:item.updatedAt,
         lastRestockedAt:item.lastRestockedAt||'',photoBlob:item.photoBlob instanceof Blob?item.photoBlob:null,
         logs:Array.isArray(item.logs)?item.logs:[]
       }
@@ -764,6 +786,31 @@
         return records.map((record,index)=>normalizeStoredItem(record,index))
       }
       return migrateLocalStorage()
+    }
+    async function migrateZoneOwnership(){
+      const marker=await getMeta('zoneOwnershipMigrationV1').catch(()=>null);
+      if(marker&&marker.value&&marker.value.complete)return;
+      const now=new Date().toISOString();
+      let unassigned=state.zones.find(zone=>zone.name.toLowerCase()==='unassigned');
+      const needsUnassigned=state.items.some(item=>!state.zones.some(zone=>zone.id===item.zoneId)&&!state.zones.some(zone=>(zone.itemIds||[]).includes(item.id)));
+      if(needsUnassigned&&!unassigned){unassigned={id:makeId(),name:'Unassigned',itemIds:[],createdAt:now,updatedAt:now};state.zones.push(unassigned)}
+      const migrated=[];
+      for(const item of state.items){
+        const referenced=state.zones.filter(zone=>(zone.itemIds||[]).includes(item.id)).sort((a,b)=>a.name.localeCompare(b.name));
+        const validOwned=state.zones.find(zone=>zone.id===item.zoneId);
+        const owners=referenced.length?referenced:validOwned?[validOwned]:unassigned?[unassigned]:[];
+        if(!owners.length)continue;
+        owners.forEach((zone,index)=>{
+          const cloneId=index===0?item.id:`${item.id}::zone::${zone.id}`;
+          const migratedItem={...item,id:cloneId,zoneId:zone.id,category:item.category||'General',photo:index===0?item.photo:objectUrl(item.photoBlob),logs:(item.logs||[]).map(log=>({...log,before:{...log.before},after:{...log.after}}))};
+          migrated.push(migratedItem);
+          zone.itemIds=[...new Set((zone.itemIds||[]).map(id=>id===item.id?cloneId:id).filter(id=>id!==item.id||cloneId===item.id))];
+          if(!zone.itemIds.includes(cloneId))zone.itemIds.push(cloneId)
+        })
+      }
+      state.items=migrated;
+      state.zones.forEach(zone=>{zone.itemIds=[...new Set(state.items.filter(item=>item.zoneId===zone.id).map(item=>item.id))];zone.updatedAt=now});
+      await putItems(state.items);await putZones(state.zones);await putMeta('zoneOwnershipMigrationV1',{complete:true,count:state.items.length,at:now})
     }
     async function requestPersistentStorage(){
       if(!navigator.storage||typeof navigator.storage.persist!=='function')return false;
@@ -864,7 +911,9 @@
     function setFilter(filter){state.filter=filter;document.querySelectorAll('[data-filter]').forEach(button=>button.classList.toggle('active',button.dataset.filter===filter));closeEditTemp();state.expandedId=null;render()}
 
     function zoneItems(zone){
-      const byId=new Map(state.items.map(item=>[item.id,item]));return (zone.itemIds||[]).map(id=>byId.get(id)).filter(Boolean)
+      const query=normalizeSearch(state.searchQuery);
+      const zoneMatch=query&&normalizeSearch(zone.name).includes(query);
+      return state.items.filter(item=>item.zoneId===zone.id).map(item=>({item,score:!query||zoneMatch?0:Math.min(fuzzyScore(item,query),fuzzyScore({name:item.category},query))})).filter(result=>Number.isFinite(result.score)&&filterMatches(result.item)).sort((a,b)=>a.item.category.localeCompare(b.item.category)||a.score-b.score||a.item.name.localeCompare(b.item.name)).map(result=>result.item)
     }
     function zoneQuickMarkup(item){
       const value=pendingValue(item),pending=value!==item.onSiteQty;
@@ -886,16 +935,17 @@
     function renderZones(){
       els.zoneCount.textContent=state.zones.length;els.toggleZones.setAttribute('aria-expanded',String(state.zonesVisible));els.zoneManager.hidden=!state.zonesVisible;document.body.classList.toggle('zones-open',state.zonesVisible);
       if(!state.zonesVisible)return;
-      if(!state.zones.length){els.zoneList.innerHTML='<div class="zone-empty"><strong>No zones yet.</strong><br>Create a named zone and assign existing inventory items.</div>';return}
+      if(!state.zones.length){els.zoneList.innerHTML='<div class="zone-empty"><strong>No zones yet.</strong><br>Create a zone, then add items directly inside it.</div>';return}
       const zones=[...state.zones].sort((a,b)=>a.name.localeCompare(b.name));
       els.zoneList.innerHTML=zones.map(zone=>{
         const items=zoneItems(zone),missing=items.reduce((sum,item)=>sum+shortage(item),0),low=items.filter(item=>shortage(item)>0).length,collapsed=state.collapsedZones.has(zone.id);
-        const rows=items.length?items.map(item=>{
+        const categories=new Map();items.forEach(item=>{const category=item.category||'General';if(!categories.has(category))categories.set(category,[]);categories.get(category).push(item)});
+        const rows=items.length?[...categories].map(([category,categoryItems])=>`<div class="zone-category">${esc(category)}</div>${categoryItems.map(item=>{
           const needed=shortage(item),pending=pendingValue(item)!==item.onSiteQty;
           const confirm=pending?'<button class="restock-btn waiting zone-confirm" type="button" disabled>Save count first</button>':needed?`<button class="restock-btn zone-confirm" type="button" data-zone-action="restock" data-item-id="${item.id}">Restocked +${needed}</button>`:'<button class="restock-btn full zone-confirm" type="button" disabled>Full</button>';
           return `<div class="zone-item-row" data-zone-item-id="${item.id}">${photoMarkup(item.photo,item.name,'zone-thumb')}<div class="zone-item-name"><strong>${esc(item.name)}</strong><span>${esc(statusInfo(item,pendingValue(item)).text)}</span></div>${zoneQuickMarkup(item)}<div class="zone-number zone-current">${item.onSiteQty}<small>On-site</small></div><div class="zone-number zone-full">${item.targetQty}<small>Full</small></div><div class="zone-number zone-missing">${needed}<small>Restock</small></div>${confirm}<button class="btn soft small zone-view" type="button" data-zone-action="view" data-item-id="${item.id}">Details</button></div>`
-        }).join(''):'<div class="zone-empty">No items are assigned to this zone.</div>';
-        return `<article class="zone-card${collapsed?' collapsed':''}" data-zone-id="${zone.id}"><header class="zone-card-header"><button class="zone-toggle" type="button" data-zone-action="toggle" aria-expanded="${!collapsed}"><span class="zone-toggle-icon">⌄</span><span class="zone-title"><strong>${esc(zone.name)}</strong><span>${items.length} item${items.length===1?'':'s'} · ${low} low · ${missing} unit${missing===1?'':'s'} to restock</span></span></button><div class="zone-card-actions"><button class="btn soft small" type="button" data-zone-action="edit">Edit</button><button class="icon-btn" type="button" data-zone-action="delete" aria-label="Delete ${esc(zone.name)}">×</button></div></header><div class="zone-card-body">${rows}</div></article>`
+        }).join('')}`).join(''):`<div class="zone-empty">${state.searchQuery||state.filter!=='all'?'No matching items in this zone.':'No items yet.'}<br><button class="btn soft small" type="button" data-zone-action="add-item">+ Add item here</button></div>`;
+        return `<article class="zone-card${collapsed?' collapsed':''}" data-zone-id="${zone.id}"><header class="zone-card-header"><button class="zone-toggle" type="button" data-zone-action="toggle" aria-expanded="${!collapsed}"><span class="zone-toggle-icon">⌄</span><span class="zone-title"><strong>${esc(zone.name)}</strong><span>${items.length} item${items.length===1?'':'s'} · ${low} low · ${missing} unit${missing===1?'':'s'} to restock</span></span></button><div class="zone-card-actions"><button class="btn soft small" type="button" data-zone-action="edit">Rename</button><button class="icon-btn" type="button" data-zone-action="delete" aria-label="Delete ${esc(zone.name)}">×</button></div></header><div class="zone-card-body">${rows}</div></article>`
       }).join('')
     }
     function zonePickerItems(){
@@ -919,15 +969,9 @@
       els.metricLow.textContent=stats.low;els.metricLowDetail.textContent=stats.low?`${stats.full} item type${stats.full===1?' is':'s are'} at or above full stock`:'All item types are full';
       els.metricStock.textContent=`${stats.onSite} / ${stats.target}`;els.metricStockDetail.textContent=`${percent}% of expected floor stock`;
       els.filterRestockCount.textContent=stats.low;els.filterAllCount.textContent=state.items.length;els.filterFullCount.textContent=stats.full;els.clearSearch.hidden=!state.searchQuery;
-      if(!state.ready){els.items.innerHTML='<div class="empty-state"><strong>Opening local database…</strong>Your inventory and automatic history are loading.</div>';return}
-      if(!state.items.length){els.items.innerHTML='<div class="empty-state"><strong>No floor items yet</strong>Add the expected full stock for each item. Sales will reduce the on-site count and create the restock queue.</div>';return}
-      const visible=visibleItems();
-      if(!visible.length){
-        if(state.filter==='restock'&&!state.searchQuery)els.items.innerHTML='<div class="empty-state"><strong>Everything is fully stocked</strong>No replenishment is currently required.<br><button class="btn soft" type="button" data-global-action="view-all">View all items</button></div>';
-        else els.items.innerHTML='<div class="empty-state"><strong>No matching items</strong>Try another search or filter.</div>';
-        return
-      }
-      els.items.innerHTML=visible.map(renderItem).join('')
+      if(!state.ready){els.items.innerHTML='';return}
+      const expanded=state.items.find(item=>item.id===state.expandedId);
+      els.items.innerHTML=expanded?renderItem(expanded):''
     }
     function renderItem(item){
       const expanded=state.expandedId===item.id;
@@ -957,6 +1001,8 @@
       return `<form class="edit-panel" data-edit-form>
         <div class="detail-photo">${photoMarkup(photo,item.name,'detail-preview')}<div class="photo-actions"><button class="btn soft small" type="button" data-action="edit-photo">Replace Photo</button><button class="btn soft small" type="button" data-action="remove-photo" ${photo?'':'disabled'}>Remove Photo</button></div></div>
         <div class="edit-fields">
+          <label>Zone<select name="zoneId" required>${state.zones.map(zone=>`<option value="${esc(zone.id)}" ${zone.id===item.zoneId?'selected':''}>${esc(zone.name)}</option>`).join('')}</select></label>
+          <label>Category<input name="category" maxlength="40" value="${esc(item.category||'General')}" required></label>
           <label>Item Name<input name="name" maxlength="60" value="${esc(item.name)}" required></label>
           <label>Full Stock<input name="targetQty" type="number" min="0" max="999999" step="1" value="${item.targetQty}" inputmode="numeric" required></label>
           <label>Current On-site<input name="onSiteQty" type="number" min="0" max="999999" step="1" value="${onSite}" inputmode="numeric" required></label>
@@ -999,8 +1045,13 @@
       els.addPreview.outerHTML=url?`<img id="addPreview" class="add-preview" src="${url}" alt="New item photo preview">`:'<div id="addPreview" class="add-preview empty">No photo selected</div>';
       els.addPreview=$('#addPreview');els.removeAddPhoto.disabled=!url
     }
-    function openAdd(photo=null){
-      disposePhoto(state.addPhoto);state.addPhoto=photo;state.addOnSiteTouched=false;els.addForm.reset();els.addTarget.value='1';els.addOnSite.value='1';setAddPreview();els.addDialog.showModal();setTimeout(()=>els.addName.focus(),50)
+    function openAdd(photo=null,zoneId=''){
+      if(!state.zones.length){state.pendingAddAfterZone=true;notify('Create a zone before adding its first item.');openZoneDialog(null);return}
+      disposePhoto(state.addPhoto);state.addPhoto=photo;els.addForm.reset();els.addOnSite.value='1';
+      els.addItemZone.innerHTML=[...state.zones].sort((a,b)=>a.name.localeCompare(b.name)).map(zone=>`<option value="${esc(zone.id)}">${esc(zone.name)}</option>`).join('');
+      els.addItemZone.value=state.zones.some(zone=>zone.id===zoneId)?zoneId:els.addItemZone.options[0].value;
+      const categories=[...new Set(state.items.map(item=>item.category||'General'))].sort((a,b)=>a.localeCompare(b));els.categorySuggestions.innerHTML=categories.map(category=>`<option value="${esc(category)}"></option>`).join('');els.addCategory.value=categories[0]||'General';
+      setAddPreview();els.addDialog.showModal();setTimeout(()=>els.addName.focus(),50)
     }
     function renderBatchDrafts(){
       els.batchCount.textContent=`${state.batchDrafts.length} photo${state.batchDrafts.length===1?'':'s'} selected`;els.saveBatch.disabled=!state.batchDrafts.length||state.batchProcessing;
@@ -1042,14 +1093,15 @@
     els.zoneForm.addEventListener('submit',async event=>{
       event.preventDefault();const name=els.zoneName.value.trim();if(!name){els.zoneName.focus();return notify('Please enter a zone name.')}
       const now=new Date().toISOString(),existing=state.zones.find(zone=>zone.id===state.zoneEditId);const zone=existing?{...existing,name,itemIds:[...state.zoneDraftItemIds],updatedAt:now}:{id:makeId(),name,itemIds:[...state.zoneDraftItemIds],createdAt:now,updatedAt:now};els.saveZone.disabled=true;
-      try{await putZone(zone);if(existing)Object.assign(existing,zone);else state.zones.push(zone);els.zoneDialog.close();render();notify(existing?'Zone updated.':'Zone created.')}
+      try{await putZone(zone);if(existing)Object.assign(existing,zone);else state.zones.push(zone);els.zoneDialog.close();render();notify(existing?'Zone updated.':'Zone created.');if(!existing&&state.pendingAddAfterZone){state.pendingAddAfterZone=false;openAdd(null,zone.id)}}
       catch(error){storageFailure(error)}finally{els.saveZone.disabled=false}
     });
     els.zoneList.addEventListener('click',async event=>{
       const button=event.target.closest('[data-zone-action]');if(!button)return;const card=button.closest('[data-zone-id]'),zone=card&&state.zones.find(value=>value.id===card.dataset.zoneId),action=button.dataset.zoneAction;
       if(action==='toggle'&&zone){if(state.collapsedZones.has(zone.id))state.collapsedZones.delete(zone.id);else state.collapsedZones.add(zone.id);renderZones();return}
       if(action==='edit'&&zone){openZoneDialog(zone);return}
-      if(action==='delete'&&zone){state.zoneDeleteId=zone.id;els.deleteZoneText.textContent=`“${zone.name}” will be deleted. Its ${zoneItems(zone).length} inventory item${zoneItems(zone).length===1?'':'s'} and all stock history will remain unchanged.`;els.deleteZoneDialog.showModal();return}
+      if(action==='add-item'&&zone){openAdd(null,zone.id);return}
+      if(action==='delete'&&zone){const count=state.items.filter(item=>item.zoneId===zone.id).length;state.zoneDeleteId=zone.id;els.deleteZoneText.textContent=`“${zone.name}” will be deleted. Its ${count} item${count===1?'':'s'} will move to Unassigned with photos and history intact.`;els.deleteZoneDialog.showModal();return}
       const itemId=button.dataset.itemId,item=state.items.find(value=>value.id===itemId);if(!item)return;
       if(action==='quick-plus'||action==='quick-minus'){
         const next=pendingValue(item)+(action==='quick-plus'?1:-1);if(next<0)return;
@@ -1058,12 +1110,12 @@
       if(action==='view'){state.filter='all';state.searchQuery='';els.inventorySearch.value='';document.querySelectorAll('[data-filter]').forEach(filter=>filter.classList.toggle('active',filter.dataset.filter==='all'));state.expandedId=item.id;closeEditTemp();render();return}
       if(action==='restock'){const amount=shortage(item);if(amount<=0)return;button.disabled=true;if(await commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:item.targetQty},`Restocked +${amount}`,{restocked:true})){delete state.pendingOnSite[item.id];render();notify(`${item.name} restocked by ${amount}.`)}else button.disabled=false}
     });
-    els.deleteZoneForm.addEventListener('submit',async event=>{event.preventDefault();const index=state.zones.findIndex(zone=>zone.id===state.zoneDeleteId);if(index<0)return;const zone=state.zones[index],submit=els.deleteZoneForm.querySelector('.danger');submit.disabled=true;try{await removeStoredZone(zone.id);state.zones.splice(index,1);state.collapsedZones.delete(zone.id);state.zoneDeleteId=null;els.deleteZoneDialog.close();render();notify(`Deleted zone ${zone.name}. Inventory items were kept.`)}catch(error){storageFailure(error)}finally{submit.disabled=false}});
+    els.deleteZoneForm.addEventListener('submit',async event=>{event.preventDefault();const index=state.zones.findIndex(zone=>zone.id===state.zoneDeleteId);if(index<0)return;const zone=state.zones[index],submit=els.deleteZoneForm.querySelector('.danger');submit.disabled=true;try{const affected=state.items.filter(item=>item.zoneId===zone.id);let unassigned=state.zones.find(value=>value.id!==zone.id&&value.name.toLowerCase()==='unassigned');if(affected.length&&!unassigned){const now=new Date().toISOString();unassigned={id:makeId(),name:'Unassigned',itemIds:[],createdAt:now,updatedAt:now};state.zones.push(unassigned);await putZone(unassigned)}affected.forEach(item=>{item.zoneId=unassigned.id;unassigned.itemIds.push(item.id)});if(affected.length){unassigned.itemIds=[...new Set(unassigned.itemIds)];unassigned.updatedAt=new Date().toISOString();await putItems(affected);await putZone(unassigned)}await removeStoredZone(zone.id);state.zones.splice(state.zones.indexOf(zone),1);state.collapsedZones.delete(zone.id);state.zoneDeleteId=null;els.deleteZoneDialog.close();render();notify(`Deleted ${zone.name}. ${affected.length?`${affected.length} item${affected.length===1?'':'s'} moved to Unassigned.`:'No items were affected.'}`)}catch(error){storageFailure(error)}finally{submit.disabled=false}});
 
     els.inventorySearch.addEventListener('input',event=>{state.searchQuery=event.target.value;render()});
     els.clearSearch.addEventListener('click',()=>{state.searchQuery='';els.inventorySearch.value='';render();els.inventorySearch.focus()});
     document.querySelectorAll('[data-filter]').forEach(button=>button.addEventListener('click',()=>setFilter(button.dataset.filter)));
-    els.cameraAdd.addEventListener('click',()=>els.quickPhoto.click());
+    els.cameraAdd.addEventListener('click',()=>openAdd(null));
     els.batchAlbumAdd.addEventListener('click',()=>els.batchPhotoInput.click());
     els.noPhotoAdd.addEventListener('click',()=>openAdd(null));
     els.quickPhoto.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'quick');event.target.value=''});
@@ -1072,8 +1124,6 @@
     els.editPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'edit');event.target.value=''});
     els.changeAddPhoto.addEventListener('click',()=>els.addPhotoInput.click());
     els.removeAddPhoto.addEventListener('click',()=>{disposePhoto(state.addPhoto);state.addPhoto=null;setAddPreview()});
-    els.addTarget.addEventListener('input',()=>{if(!state.addOnSiteTouched)els.addOnSite.value=els.addTarget.value});
-    els.addOnSite.addEventListener('input',()=>{state.addOnSiteTouched=true});
 
     els.batchItems.addEventListener('input',event=>{
       const row=event.target.closest('[data-batch-id]');if(!row)return;const draft=state.batchDrafts.find(value=>value.id===row.dataset.batchId);if(!draft)return;
@@ -1093,7 +1143,8 @@
         const name=row.querySelector('[data-batch-name]').value.trim()||'Untitled Item',targetQty=Number(row.querySelector('[data-batch-target]').value),onSiteQty=Number(row.querySelector('[data-batch-onsite]').value);
         if(!Number.isInteger(targetQty)||targetQty<0||targetQty>999999){row.querySelector('[data-batch-target]').focus();return notify('Each full stock value must be a valid whole number.')}
         if(!Number.isInteger(onSiteQty)||onSiteQty<0||onSiteQty>999999){row.querySelector('[data-batch-onsite]').focus();return notify('Each on-site value must be a valid whole number.')}
-        const at=new Date(now+index).toISOString(),item={id:makeId(),name,targetQty,onSiteQty,createdAt:at,updatedAt:at,lastRestockedAt:'',photoBlob:draft.photo.blob,photo:draft.photo.url,logs:[]};
+        const fallbackZone=state.zones[0];if(!fallbackZone)return notify('Create a zone before adding items.');
+        const at=new Date(now+index).toISOString(),item={id:makeId(),zoneId:fallbackZone.id,category:'General',name,targetQty,onSiteQty,createdAt:at,updatedAt:at,lastRestockedAt:'',photoBlob:draft.photo.blob,photo:draft.photo.url,logs:[]};
         item.logs=[makeLog('Item created by batch import',{targetQty:0,onSiteQty:0},snapshot(item),at)];created.push(item)
       }
       if(!created.length)return notify('No items were created.');els.saveBatch.disabled=true;
@@ -1101,14 +1152,14 @@
       catch(error){storageFailure(error);els.saveBatch.disabled=false}
     });
     els.addForm.addEventListener('submit',async event=>{
-      event.preventDefault();const name=els.addName.value.trim(),targetQty=Number(els.addTarget.value),onSiteQty=Number(els.addOnSite.value);
+      event.preventDefault();const zoneId=els.addItemZone.value,category=els.addCategory.value.trim(),name=els.addName.value.trim(),onSiteQty=Number(els.addOnSite.value),targetQty=onSiteQty;
+      if(!state.zones.some(zone=>zone.id===zoneId))return notify('Please choose a valid zone.');
+      if(!category){els.addCategory.focus();return notify('Please enter a category.')}
       if(!name){els.addName.focus();return notify('Please enter an item name.')}
-      if(!Number.isInteger(targetQty)||targetQty<0||targetQty>999999)return notify('Please enter a valid full stock level.');
       if(!Number.isInteger(onSiteQty)||onSiteQty<0||onSiteQty>999999)return notify('Please enter a valid current on-site count.');
-      if(!state.addPhoto&&!confirm('Save this item without a photo?'))return;
-      const now=new Date().toISOString(),item={id:makeId(),name,targetQty,onSiteQty,createdAt:now,updatedAt:now,lastRestockedAt:'',photoBlob:state.addPhoto&&state.addPhoto.blob||null,photo:state.addPhoto&&state.addPhoto.url||'',logs:[]};
+      const now=new Date().toISOString(),item={id:makeId(),zoneId,category,name,targetQty,onSiteQty,createdAt:now,updatedAt:now,lastRestockedAt:'',photoBlob:state.addPhoto&&state.addPhoto.blob||null,photo:state.addPhoto&&state.addPhoto.url||'',logs:[]};
       item.logs=[makeLog('Item created',{targetQty:0,onSiteQty:0},snapshot(item),now)];els.saveAdd.disabled=true;
-      try{await putItem(item);state.items.push(item);state.addPhoto=null;els.addDialog.close();render();notify('Item added.')}
+      try{await putItem(item);state.items.push(item);const zone=state.zones.find(value=>value.id===zoneId);zone.itemIds=[...new Set([...(zone.itemIds||[]),item.id])];zone.updatedAt=now;await putZone(zone);state.addPhoto=null;els.addDialog.close();render();notify(`Added ${item.name} to ${zone.name}.`)}
       catch(error){storageFailure(error)}finally{els.saveAdd.disabled=false}
     });
 
@@ -1151,7 +1202,9 @@
     });
     els.items.addEventListener('submit',async event=>{
       const form=event.target.closest('[data-edit-form]');if(!form)return;event.preventDefault();const record=form.closest('.item-record'),item=state.items.find(value=>value.id===record.dataset.id);if(!item)return;
-      const name=form.elements.name.value.trim(),targetQty=Number(form.elements.targetQty.value),onSiteQty=Number(form.elements.onSiteQty.value);
+      const zoneId=form.elements.zoneId.value,category=form.elements.category.value.trim(),name=form.elements.name.value.trim(),targetQty=Number(form.elements.targetQty.value),onSiteQty=Number(form.elements.onSiteQty.value);
+      if(!state.zones.some(zone=>zone.id===zoneId))return notify('Please choose a valid zone.');
+      if(!category){form.elements.category.focus();return notify('Please enter a category.')}
       if(!name){form.elements.name.focus();return notify('Please enter an item name.')}
       if(!Number.isInteger(targetQty)||targetQty<0||targetQty>999999)return notify('Please enter a valid full stock level.');
       if(!Number.isInteger(onSiteQty)||onSiteQty<0||onSiteQty>999999)return notify('Please enter a valid current on-site count.');
@@ -1160,10 +1213,10 @@
       if(targetQty!==before.targetQty)action=onSiteQty!==before.onSiteQty?'Stock levels updated':'Full stock level changed';
       const nextPhotoBlob=state.editPhotoTemp===undefined?item.photoBlob:state.editPhotoTemp===null?null:state.editPhotoTemp.blob;
       const nextPhoto=state.editPhotoTemp===undefined?item.photo:state.editPhotoTemp===null?'':state.editPhotoTemp.url;
-      const nextItem={...item,name,targetQty,onSiteQty,updatedAt:now,photoBlob:nextPhotoBlob,photo:nextPhoto,logs:[...(item.logs||[]),makeLog(action,before,{targetQty,onSiteQty},now)]};
+      const previousZoneId=item.zoneId,nextItem={...item,zoneId,category,name,targetQty,onSiteQty,updatedAt:now,photoBlob:nextPhotoBlob,photo:nextPhoto,logs:[...(item.logs||[]),makeLog(action,before,{targetQty,onSiteQty},now)]};
       const submit=form.querySelector('button[type="submit"],button.btn.primary');if(submit)submit.disabled=true;
       try{
-        await putItem(nextItem);const oldPhoto=item.photo;Object.assign(item,nextItem);if(oldPhoto!==nextPhoto)revokeUrl(oldPhoto);
+        await putItem(nextItem);const changedZones=state.zones.filter(zone=>zone.id===previousZoneId||zone.id===zoneId);changedZones.forEach(zone=>{zone.itemIds=zone.id===zoneId?[...new Set([...(zone.itemIds||[]),item.id])]:(zone.itemIds||[]).filter(id=>id!==item.id);zone.updatedAt=now});await putZones(changedZones);const oldPhoto=item.photo;Object.assign(item,nextItem);if(oldPhoto!==nextPhoto)revokeUrl(oldPhoto);
         delete state.pendingOnSite[item.id];state.expandedId=null;state.editPhotoTemp=undefined;render();notify('Item updated.')
       }catch(error){storageFailure(error);if(submit)submit.disabled=false}
     });
@@ -1175,6 +1228,7 @@
     document.addEventListener('click',event=>{const dialogId=event.target.dataset.close;if(dialogId)document.getElementById(dialogId).close();if(!event.target.closest('.settings'))document.querySelectorAll('.settings[open]').forEach(menu=>menu.open=false)});
     [els.addDialog,els.batchDialog,els.zoneDialog,els.deleteZoneDialog,els.deleteDialog].forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
     els.addDialog.addEventListener('close',()=>{disposePhoto(state.addPhoto);state.addPhoto=null});
+    els.zoneDialog.addEventListener('close',()=>{if(!state.zones.length)state.pendingAddAfterZone=false});
     els.batchDialog.addEventListener('close',()=>{state.batchDrafts.forEach(draft=>disposePhoto(draft.photo));state.batchDrafts=[];els.batchItems.innerHTML=''});
 
     ['gesturestart','gesturechange','gestureend'].forEach(type=>document.addEventListener(type,event=>event.preventDefault(),{passive:false}));
@@ -1188,6 +1242,7 @@
       db=await openDatabase();
       state.items=await loadItems();
       state.zones=await loadZones();
+      await migrateZoneOwnership();
       state.ready=true;
       const persistent=await requestPersistentStorage();
       if(els.storageNote)els.storageNote.textContent=persistent?'IndexedDB · persistent automatic history':'IndexedDB · automatic history';
