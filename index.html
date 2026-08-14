@@ -160,7 +160,7 @@
     .detail-photo{display:grid;align-content:start;gap:9px}
     .detail-preview{width:100%;aspect-ratio:4/3;border:1px solid var(--line);border-radius:13px;object-fit:cover;background:#ebebe6}
     .detail-preview.empty{display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center}
-    .photo-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+    .photo-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
     .edit-fields{display:grid;grid-template-columns:minmax(0,1fr) 150px 150px;gap:13px;align-content:start}
     label{display:grid;gap:7px;color:var(--muted);font-size:12px;font-weight:680}
     input{width:100%;min-height:45px;padding:0 13px;border:1px solid var(--line);border-radius:11px;background:#fff;outline:0;color:var(--ink);font-size:16px}
@@ -221,7 +221,7 @@
     .add-preview.empty{display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center}
     .modal-grid{display:grid;grid-template-columns:minmax(0,1fr) 130px 130px;gap:12px}
     .modal-grid label:first-child{grid-column:1/-1}
-    .modal-photo-actions{display:flex;gap:8px;margin:0 0 14px}
+    .modal-photo-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
     .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:17px}
     .toast{position:fixed;left:50%;bottom:calc(116px + env(safe-area-inset-bottom));z-index:12;transform:translate(-50%,15px);padding:10px 15px;border-radius:99px;background:var(--ink);color:#fff;font-size:13px;opacity:0;pointer-events:none;transition:.2s;box-shadow:var(--shadow)}
     .toast.show{opacity:1;transform:translate(-50%,0)}
@@ -304,6 +304,7 @@
       .detail-photo{grid-template-columns:1fr}
       .detail-preview{width:100%}
       .photo-actions{grid-template-columns:1fr 1fr}
+      .photo-actions .remove-photo{grid-column:1/-1}
       .log-entry{grid-template-columns:1fr auto;gap:6px 10px}
       .log-snapshot{grid-column:1/-1}
       .fab-secondary{max-width:calc(100vw - 20px)}
@@ -510,8 +511,10 @@
 
   <input class="file" id="quickPhoto" type="file" accept="image/*" capture="environment">
   <input class="file" id="batchPhotoInput" type="file" accept="image/*" multiple>
-  <input class="file" id="addPhotoInput" type="file" accept="image/*" capture="environment">
-  <input class="file" id="editPhotoInput" type="file" accept="image/*" capture="environment">
+  <input class="file" id="addPhotoInput" type="file" accept="image/*">
+  <input class="file" id="addCameraInput" type="file" accept="image/*" capture="environment">
+  <input class="file" id="editPhotoInput" type="file" accept="image/*">
+  <input class="file" id="editCameraInput" type="file" accept="image/*" capture="environment">
 
   <dialog id="addDialog">
     <form class="modal" id="addForm">
@@ -519,7 +522,8 @@
       <p>Choose exactly where this item belongs. It will only appear inside that zone and category.</p>
       <div id="addPreview" class="add-preview empty">No photo selected</div>
       <div class="modal-photo-actions">
-        <button class="btn soft small" type="button" id="changeAddPhoto">Take / Choose Photo</button>
+        <button class="btn soft small" type="button" id="changeAddPhoto">Choose from Library</button>
+        <button class="btn soft small" type="button" id="takeAddPhoto">Take Photo</button>
         <button class="btn soft small" type="button" id="removeAddPhoto">Remove Photo</button>
       </div>
       <div class="modal-grid">
@@ -621,9 +625,9 @@
       filterRestockCount:$('#filterRestockCount'),filterAllCount:$('#filterAllCount'),filterFullCount:$('#filterFullCount'),
       inventorySearch:$('#inventorySearch'),clearSearch:$('#clearSearch'),cameraAdd:$('#cameraAdd'),batchAlbumAdd:$('#batchAlbumAdd'),noPhotoAdd:$('#noPhotoAdd'),
       toggleZones:$('#toggleZones'),zoneCount:$('#zoneCount'),addZone:$('#addZone'),addZoneInside:$('#addZoneInside'),zoneManager:$('#zoneManager'),zoneList:$('#zoneList'),expandAllZones:$('#expandAllZones'),collapseAllZones:$('#collapseAllZones'),
-      quickPhoto:$('#quickPhoto'),batchPhotoInput:$('#batchPhotoInput'),addPhotoInput:$('#addPhotoInput'),editPhotoInput:$('#editPhotoInput'),
+      quickPhoto:$('#quickPhoto'),batchPhotoInput:$('#batchPhotoInput'),addPhotoInput:$('#addPhotoInput'),addCameraInput:$('#addCameraInput'),editPhotoInput:$('#editPhotoInput'),editCameraInput:$('#editCameraInput'),
       addDialog:$('#addDialog'),addForm:$('#addForm'),addPreview:$('#addPreview'),addName:$('#addName'),addItemZone:$('#addItemZone'),addCategory:$('#addCategory'),categorySuggestions:$('#categorySuggestions'),addOnSite:$('#addOnSite'),
-      changeAddPhoto:$('#changeAddPhoto'),removeAddPhoto:$('#removeAddPhoto'),saveAdd:$('#saveAdd'),
+      changeAddPhoto:$('#changeAddPhoto'),takeAddPhoto:$('#takeAddPhoto'),removeAddPhoto:$('#removeAddPhoto'),saveAdd:$('#saveAdd'),
       batchDialog:$('#batchDialog'),batchForm:$('#batchForm'),batchItems:$('#batchItems'),batchCount:$('#batchCount'),saveBatch:$('#saveBatch'),
       zoneDialog:$('#zoneDialog'),zoneForm:$('#zoneForm'),zoneDialogTitle:$('#zoneDialogTitle'),zoneName:$('#zoneName'),zoneItemSearch:$('#zoneItemSearch'),zoneItemPicker:$('#zoneItemPicker'),zoneSelectAll:$('#zoneSelectAll'),zoneClearAll:$('#zoneClearAll'),saveZone:$('#saveZone'),
       deleteZoneDialog:$('#deleteZoneDialog'),deleteZoneForm:$('#deleteZoneForm'),deleteZoneText:$('#deleteZoneText'),
@@ -1016,7 +1020,7 @@
     function renderEditPanel(item,photo,onSite){
       const missing=Math.max(0,item.targetQty-onSite);
       return `<form class="edit-panel" data-edit-form>
-        <div class="detail-photo">${photoMarkup(photo,item.name,'detail-preview')}<div class="photo-actions"><button class="btn soft small" type="button" data-action="edit-photo">Replace Photo</button><button class="btn soft small" type="button" data-action="remove-photo" ${photo?'':'disabled'}>Remove Photo</button></div></div>
+        <div class="detail-photo">${photoMarkup(photo,item.name,'detail-preview')}<div class="photo-actions"><button class="btn soft small" type="button" data-action="edit-photo">Choose from Library</button><button class="btn soft small" type="button" data-action="take-edit-photo">Take Photo</button><button class="btn soft small remove-photo" type="button" data-action="remove-photo" ${photo?'':'disabled'}>Remove Photo</button></div></div>
         <div class="edit-fields">
           <label>Zone<select name="zoneId" required>${state.zones.map(zone=>`<option value="${esc(zone.id)}" ${zone.id===item.zoneId?'selected':''}>${esc(zone.name)}</option>`).join('')}</select></label>
           <label>Category<input name="category" maxlength="40" value="${esc(item.category||'General')}" required></label>
@@ -1155,8 +1159,11 @@
     els.quickPhoto.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'quick');event.target.value=''});
     els.batchPhotoInput.addEventListener('change',async event=>{await openBatch(event.target.files);event.target.value=''});
     els.addPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'add');event.target.value=''});
+    els.addCameraInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'add');event.target.value=''});
     els.editPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'edit');event.target.value=''});
+    els.editCameraInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'edit');event.target.value=''});
     els.changeAddPhoto.addEventListener('click',()=>els.addPhotoInput.click());
+    els.takeAddPhoto.addEventListener('click',()=>els.addCameraInput.click());
     els.removeAddPhoto.addEventListener('click',()=>{disposePhoto(state.addPhoto);state.addPhoto=null;setAddPreview()});
 
     els.batchItems.addEventListener('input',event=>{
@@ -1229,6 +1236,7 @@
         }
         if(action==='delete'){closeSettings(actionButton);state.deleteId=id;els.deleteText.textContent=`“${item.name}” and its stock history will be permanently deleted.`;els.deleteDialog.showModal();return}
         if(action==='edit-photo'){els.editPhotoInput.click();return}
+        if(action==='take-edit-photo'){els.editCameraInput.click();return}
         if(action==='remove-photo'){if(state.editPhotoTemp&&state.editPhotoTemp.url)disposePhoto(state.editPhotoTemp);state.editPhotoTemp=null;render();return}
         if(action==='cancel-edit'){delete state.pendingOnSite[id];state.expandedId=null;closeEditTemp();render();return}
       }
