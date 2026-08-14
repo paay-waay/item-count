@@ -363,6 +363,10 @@
     .zone-qty.pending{background:#f1f8df;color:#47651a}
     .zone-save-state{display:block;margin-top:2px;color:var(--muted);font-size:9px;font-weight:700;min-height:11px}
     .zone-view{min-height:38px;padding:0 9px!important;font-size:11px!important}
+    .zone-item-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px}
+    .zone-move{min-height:38px;padding:0 10px;border:0;border-radius:10px;background:var(--cyan-soft);color:#087688;font-size:11px;font-weight:820;white-space:nowrap}
+    .zone-move:active{transform:scale(.96);background:#cceff4}
+    .zone-move:disabled{opacity:.4;cursor:not-allowed}
     .inventory{margin-top:12px}
     .inventory::before{content:'All inventory';display:block;padding:15px 14px 4px;color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.055em}
     .chevron{display:none}
@@ -385,7 +389,9 @@
       .zone-item-row>.zone-thumb{grid-area:photo}
       .zone-item-row>.zone-item-name{grid-area:name}
       .zone-item-row>.zone-quick-wrap{grid-area:count}
-      .zone-item-row>.zone-view{grid-area:detail;justify-self:end;min-height:26px;background:transparent;color:var(--muted)}
+      .zone-item-row>.zone-item-actions{grid-area:detail;justify-self:end}
+      .zone-item-row .zone-view{min-height:30px;background:transparent;color:var(--muted)}
+      .zone-item-row .zone-move{min-height:30px}
       .zone-quick-count{grid-template-columns:42px minmax(48px,1fr) 42px}
       .zone-step{width:42px;height:42px}
       .zone-qty{height:42px;font-size:19px}
@@ -401,7 +407,7 @@
       .toolbar{grid-template-columns:1fr 46px}
       .filters{grid-column:1/-1;grid-row:2}
       .zone-item-row{grid-template-columns:42px minmax(0,1fr);grid-template-areas:'photo name' 'count count' 'detail detail';gap:6px 8px}
-      .zone-item-row>.zone-view{justify-self:end}
+      .zone-item-row>.zone-item-actions{justify-self:end}
       .zone-quick-count{grid-template-columns:46px minmax(60px,1fr) 46px}
       .zone-step{width:46px;height:44px}
       .zone-save-state{text-align:center}
@@ -583,6 +589,18 @@
     </form>
   </dialog>
 
+  <dialog id="moveDialog">
+    <form class="modal" id="moveForm">
+      <h2>Send to another zone</h2>
+      <p id="moveText">Choose the destination zone. The complete item and its current count will move together.</p>
+      <label>Destination Zone<select id="moveZone" required></select></label>
+      <div class="modal-actions">
+        <button class="btn soft" type="button" data-close="moveDialog">Cancel</button>
+        <button class="btn primary" id="confirmMove">Move Item</button>
+      </div>
+    </form>
+  </dialog>
+
   <div class="toast" id="toast" role="status"></div>
 
   <script>
@@ -609,11 +627,12 @@
       batchDialog:$('#batchDialog'),batchForm:$('#batchForm'),batchItems:$('#batchItems'),batchCount:$('#batchCount'),saveBatch:$('#saveBatch'),
       zoneDialog:$('#zoneDialog'),zoneForm:$('#zoneForm'),zoneDialogTitle:$('#zoneDialogTitle'),zoneName:$('#zoneName'),zoneItemSearch:$('#zoneItemSearch'),zoneItemPicker:$('#zoneItemPicker'),zoneSelectAll:$('#zoneSelectAll'),zoneClearAll:$('#zoneClearAll'),saveZone:$('#saveZone'),
       deleteZoneDialog:$('#deleteZoneDialog'),deleteZoneForm:$('#deleteZoneForm'),deleteZoneText:$('#deleteZoneText'),
-      deleteDialog:$('#deleteDialog'),deleteForm:$('#deleteForm'),deleteText:$('#deleteText'),toast:$('#toast'),storageNote:$('#storageNote')
+      deleteDialog:$('#deleteDialog'),deleteForm:$('#deleteForm'),deleteText:$('#deleteText'),
+      moveDialog:$('#moveDialog'),moveForm:$('#moveForm'),moveText:$('#moveText'),moveZone:$('#moveZone'),confirmMove:$('#confirmMove'),toast:$('#toast'),storageNote:$('#storageNote')
     };
 
     const state={
-      items:[],expandedId:null,deleteId:null,addPhoto:null,editPhotoTemp:undefined,
+      items:[],expandedId:null,deleteId:null,moveItemId:null,addPhoto:null,editPhotoTemp:undefined,
       batchDrafts:[],batchProcessing:false,pendingOnSite:{},searchQuery:'',filter:'all',
       zones:[],zonesVisible:true,zoneEditId:null,zoneDeleteId:null,zoneDraftItemIds:new Set(),zoneItemQuery:'',collapsedZones:new Set(),pendingAddAfterZone:false,
       ready:false
@@ -622,6 +641,7 @@
     let toastTimer;
     const zoneSaveTimers=new Map();
     const zoneSaveTokens=new Map();
+    const zoneSavePromises=new Map();
 
     function makeId(){return crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(16).slice(2)}
     function validDate(value){return typeof value==='string'&&!Number.isNaN(Date.parse(value))}
@@ -724,6 +744,9 @@
     }
     async function removeItemAndZoneRefs(id,zones){
       const tx=db.transaction([ITEMS_STORE,ZONES_STORE],'readwrite');tx.objectStore(ITEMS_STORE).delete(id);const store=tx.objectStore(ZONES_STORE);zones.forEach(zone=>store.put(serializeZone(zone)));await transactionPromise(tx)
+    }
+    async function moveStoredItem(item,zones){
+      const tx=db.transaction([ITEMS_STORE,ZONES_STORE],'readwrite'),zoneStore=tx.objectStore(ZONES_STORE);tx.objectStore(ITEMS_STORE).put(serializeItem(item));zones.forEach(zone=>zoneStore.put(serializeZone(zone)));await transactionPromise(tx)
     }
     async function loadZones(){const records=await getAllStoredZones();return records.map((record,index)=>normalizeZone(record,index))}
 
@@ -922,14 +945,8 @@
     function scheduleZoneSave(item){
       const id=item.id,token=(zoneSaveTokens.get(id)||0)+1;zoneSaveTokens.set(id,token);clearTimeout(zoneSaveTimers.get(id));
       zoneSaveTimers.set(id,setTimeout(async()=>{
-        const next=pendingValue(item),old=item.onSiteQty;if(next===old)return;
-        const difference=next-old,label=difference<0?`Sales saved: ${Math.abs(difference)} sold`:`On-site count adjusted +${difference}`;
-        if(await commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:next},label)){
-          if(zoneSaveTokens.get(id)===token&&pendingValue(item)===next)delete state.pendingOnSite[id];
-          render();notify(`${item.name}: ${old} → ${next}`)
-        }else{
-          if(zoneSaveTokens.get(id)===token)delete state.pendingOnSite[id];render()
-        }
+        const savePromise=(async()=>{const next=pendingValue(item),old=item.onSiteQty;if(next===old)return;const difference=next-old,label=difference<0?`Sales saved: ${Math.abs(difference)} sold`:`On-site count adjusted +${difference}`;if(await commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:next},label)){if(zoneSaveTokens.get(id)===token&&pendingValue(item)===next)delete state.pendingOnSite[id];render();notify(`${item.name}: ${old} → ${next}`)}else{if(zoneSaveTokens.get(id)===token)delete state.pendingOnSite[id];render()}})();
+        zoneSavePromises.set(id,savePromise);try{await savePromise}finally{if(zoneSavePromises.get(id)===savePromise)zoneSavePromises.delete(id)}
       },650))
     }
     function renderZones(){
@@ -943,7 +960,7 @@
         const rows=items.length?[...categories].map(([category,categoryItems])=>`<div class="zone-category">${esc(category)}</div>${categoryItems.map(item=>{
           const needed=shortage(item),pending=pendingValue(item)!==item.onSiteQty;
           const confirm=pending?'<button class="restock-btn waiting zone-confirm" type="button" disabled>Save count first</button>':needed?`<button class="restock-btn zone-confirm" type="button" data-zone-action="restock" data-item-id="${item.id}">Restocked +${needed}</button>`:'<button class="restock-btn full zone-confirm" type="button" disabled>Full</button>';
-          return `<div class="zone-item-row" data-zone-item-id="${item.id}">${photoMarkup(item.photo,item.name,'zone-thumb')}<div class="zone-item-name"><strong>${esc(item.name)}</strong><span>${esc(statusInfo(item,pendingValue(item)).text)}</span></div>${zoneQuickMarkup(item)}<div class="zone-number zone-current">${item.onSiteQty}<small>On-site</small></div><div class="zone-number zone-full">${item.targetQty}<small>Full</small></div><div class="zone-number zone-missing">${needed}<small>Restock</small></div>${confirm}<button class="btn soft small zone-view" type="button" data-zone-action="view" data-item-id="${item.id}">Details</button></div>`
+          return `<div class="zone-item-row" data-zone-item-id="${item.id}">${photoMarkup(item.photo,item.name,'zone-thumb')}<div class="zone-item-name"><strong>${esc(item.name)}</strong><span>${esc(statusInfo(item,pendingValue(item)).text)}</span></div>${zoneQuickMarkup(item)}<div class="zone-number zone-current">${item.onSiteQty}<small>On-site</small></div><div class="zone-number zone-full">${item.targetQty}<small>Full</small></div><div class="zone-number zone-missing">${needed}<small>Restock</small></div>${confirm}<div class="zone-item-actions"><button class="zone-move" type="button" data-zone-action="move" data-item-id="${item.id}" ${state.zones.length<2?'disabled':''} aria-label="Send ${esc(item.name)} to another zone">Move</button><button class="btn soft small zone-view" type="button" data-zone-action="view" data-item-id="${item.id}">Details</button></div></div>`
         }).join('')}`).join(''):`<div class="zone-empty">${state.searchQuery||state.filter!=='all'?'No matching items in this zone.':'No items yet.'}<br><button class="btn soft small" type="button" data-zone-action="add-item">+ Add item here</button></div>`;
         return `<article class="zone-card${collapsed?' collapsed':''}" data-zone-id="${zone.id}"><header class="zone-card-header"><button class="zone-toggle" type="button" data-zone-action="toggle" aria-expanded="${!collapsed}"><span class="zone-toggle-icon">⌄</span><span class="zone-title"><strong>${esc(zone.name)}</strong><span>${items.length} item${items.length===1?'':'s'} · ${low} low · ${missing} unit${missing===1?'':'s'} to restock</span></span></button><div class="zone-card-actions"><button class="btn soft small" type="button" data-zone-action="edit">Rename</button><button class="icon-btn" type="button" data-zone-action="delete" aria-label="Delete ${esc(zone.name)}">×</button></div></header><div class="zone-card-body">${rows}</div></article>`
       }).join('')
@@ -1081,6 +1098,11 @@
       render()
     }
     function closeSettings(target){const details=target.closest('details');if(details)details.open=false}
+    function openMoveDialog(item){
+      const current=state.zones.find(zone=>zone.id===item.zoneId),destinations=state.zones.filter(zone=>zone.id!==item.zoneId).sort((a,b)=>a.name.localeCompare(b.name));
+      if(!destinations.length)return notify('Create another zone before moving this item.');
+      state.moveItemId=item.id;els.moveText.textContent=`Move “${item.name}” from ${current&&current.name||'its current zone'}. Photo, category, full stock, current count, and history will stay with it.`;els.moveZone.innerHTML=destinations.map(zone=>`<option value="${esc(zone.id)}">${esc(zone.name)}</option>`).join('');els.moveDialog.showModal();setTimeout(()=>els.moveZone.focus(),40)
+    }
 
     els.toggleZones.addEventListener('click',()=>{state.zonesVisible=!state.zonesVisible;render();if(state.zonesVisible)setTimeout(()=>els.zoneManager.scrollIntoView({behavior:'smooth',block:'start'}),20)});
     [els.addZone,els.addZoneInside].forEach(button=>button.addEventListener('click',()=>openZoneDialog(null)));
@@ -1107,10 +1129,22 @@
         const next=pendingValue(item)+(action==='quick-plus'?1:-1);if(next<0)return;
         stageOnSite(item,next);scheduleZoneSave(item);return
       }
+      if(action==='move'){openMoveDialog(item);return}
       if(action==='view'){state.filter='all';state.searchQuery='';els.inventorySearch.value='';document.querySelectorAll('[data-filter]').forEach(filter=>filter.classList.toggle('active',filter.dataset.filter==='all'));state.expandedId=item.id;closeEditTemp();render();return}
       if(action==='restock'){const amount=shortage(item);if(amount<=0)return;button.disabled=true;if(await commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:item.targetQty},`Restocked +${amount}`,{restocked:true})){delete state.pendingOnSite[item.id];render();notify(`${item.name} restocked by ${amount}.`)}else button.disabled=false}
     });
     els.deleteZoneForm.addEventListener('submit',async event=>{event.preventDefault();const index=state.zones.findIndex(zone=>zone.id===state.zoneDeleteId);if(index<0)return;const zone=state.zones[index],submit=els.deleteZoneForm.querySelector('.danger');submit.disabled=true;try{const affected=state.items.filter(item=>item.zoneId===zone.id);let unassigned=state.zones.find(value=>value.id!==zone.id&&value.name.toLowerCase()==='unassigned');if(affected.length&&!unassigned){const now=new Date().toISOString();unassigned={id:makeId(),name:'Unassigned',itemIds:[],createdAt:now,updatedAt:now};state.zones.push(unassigned);await putZone(unassigned)}affected.forEach(item=>{item.zoneId=unassigned.id;unassigned.itemIds.push(item.id)});if(affected.length){unassigned.itemIds=[...new Set(unassigned.itemIds)];unassigned.updatedAt=new Date().toISOString();await putItems(affected);await putZone(unassigned)}await removeStoredZone(zone.id);state.zones.splice(state.zones.indexOf(zone),1);state.collapsedZones.delete(zone.id);state.zoneDeleteId=null;els.deleteZoneDialog.close();render();notify(`Deleted ${zone.name}. ${affected.length?`${affected.length} item${affected.length===1?'':'s'} moved to Unassigned.`:'No items were affected.'}`)}catch(error){storageFailure(error)}finally{submit.disabled=false}});
+
+    els.moveForm.addEventListener('submit',async event=>{
+      event.preventDefault();const item=state.items.find(value=>value.id===state.moveItemId),destination=state.zones.find(zone=>zone.id===els.moveZone.value),source=item&&state.zones.find(zone=>zone.id===item.zoneId);if(!item||!destination||!source||source.id===destination.id)return notify('Please choose another zone.');
+      clearTimeout(zoneSaveTimers.get(item.id));zoneSaveTimers.delete(item.id);zoneSaveTokens.set(item.id,(zoneSaveTokens.get(item.id)||0)+1);els.confirmMove.disabled=true;
+      const activeSave=zoneSavePromises.get(item.id);if(activeSave)await activeSave;
+      const nextCount=pendingValue(item),now=new Date().toISOString(),before=snapshot(item),countChanged=nextCount!==item.onSiteQty;
+      const action=countChanged?`Moved from ${source.name} to ${destination.name}; on-site ${item.onSiteQty} → ${nextCount}`:`Moved from ${source.name} to ${destination.name}`;
+      const movedItem={...item,zoneId:destination.id,onSiteQty:nextCount,updatedAt:now,logs:[...(item.logs||[]),makeLog(action,before,{targetQty:item.targetQty,onSiteQty:nextCount},now)]};
+      const sourceNext={...source,itemIds:(source.itemIds||[]).filter(id=>id!==item.id),updatedAt:now},destinationNext={...destination,itemIds:[...new Set([...(destination.itemIds||[]),item.id])],updatedAt:now};
+      try{await moveStoredItem(movedItem,[sourceNext,destinationNext]);Object.assign(item,movedItem);Object.assign(source,sourceNext);Object.assign(destination,destinationNext);delete state.pendingOnSite[item.id];state.moveItemId=null;els.moveDialog.close();render();notify(`Moved ${item.name} to ${destination.name} with count ${item.onSiteQty}.`)}catch(error){storageFailure(error)}finally{els.confirmMove.disabled=false}
+    });
 
     els.inventorySearch.addEventListener('input',event=>{state.searchQuery=event.target.value;render()});
     els.clearSearch.addEventListener('click',()=>{state.searchQuery='';els.inventorySearch.value='';render();els.inventorySearch.focus()});
@@ -1226,9 +1260,10 @@
       catch(error){storageFailure(error)}finally{submit.disabled=false}
     });
     document.addEventListener('click',event=>{const dialogId=event.target.dataset.close;if(dialogId)document.getElementById(dialogId).close();if(!event.target.closest('.settings'))document.querySelectorAll('.settings[open]').forEach(menu=>menu.open=false)});
-    [els.addDialog,els.batchDialog,els.zoneDialog,els.deleteZoneDialog,els.deleteDialog].forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
+    [els.addDialog,els.batchDialog,els.zoneDialog,els.deleteZoneDialog,els.deleteDialog,els.moveDialog].forEach(dialog=>dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close()}));
     els.addDialog.addEventListener('close',()=>{disposePhoto(state.addPhoto);state.addPhoto=null});
     els.zoneDialog.addEventListener('close',()=>{if(!state.zones.length)state.pendingAddAfterZone=false});
+    els.moveDialog.addEventListener('close',()=>{state.moveItemId=null});
     els.batchDialog.addEventListener('close',()=>{state.batchDrafts.forEach(draft=>disposePhoto(draft.photo));state.batchDrafts=[];els.batchItems.innerHTML=''});
 
     ['gesturestart','gesturechange','gestureend'].forEach(type=>document.addEventListener(type,event=>event.preventDefault(),{passive:false}));
