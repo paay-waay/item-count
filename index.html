@@ -160,7 +160,7 @@
     .detail-photo{display:grid;align-content:start;gap:9px}
     .detail-preview{width:100%;aspect-ratio:4/3;border:1px solid var(--line);border-radius:13px;object-fit:cover;background:#ebebe6}
     .detail-preview.empty{display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center}
-    .photo-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+    .photo-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
     .edit-fields{display:grid;grid-template-columns:minmax(0,1fr) 150px 150px;gap:13px;align-content:start}
     label{display:grid;gap:7px;color:var(--muted);font-size:12px;font-weight:680}
     input{width:100%;min-height:45px;padding:0 13px;border:1px solid var(--line);border-radius:11px;background:#fff;outline:0;color:var(--ink);font-size:16px}
@@ -368,6 +368,8 @@
     .zone-move{min-height:38px;padding:0 10px;border:0;border-radius:10px;background:var(--cyan-soft);color:#087688;font-size:11px;font-weight:820;white-space:nowrap}
     .zone-move:active{transform:scale(.96);background:#cceff4}
     .zone-move:disabled{opacity:.4;cursor:not-allowed}
+    .zone-delete-item{min-height:38px;padding:0 9px;border:0;border-radius:10px;background:transparent;color:var(--danger);font-size:11px;font-weight:780;white-space:nowrap}
+    .zone-delete-item:active{transform:scale(.96);background:var(--danger-soft)}
     .inventory{margin-top:12px}
     .inventory::before{content:'All inventory';display:block;padding:15px 14px 4px;color:var(--muted);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.055em}
     .chevron{display:none}
@@ -393,6 +395,7 @@
       .zone-item-row>.zone-item-actions{grid-area:detail;justify-self:end}
       .zone-item-row .zone-view{min-height:30px;background:transparent;color:var(--muted)}
       .zone-item-row .zone-move{min-height:30px}
+      .zone-item-row .zone-delete-item{min-height:30px}
       .zone-quick-count{grid-template-columns:42px minmax(48px,1fr) 42px}
       .zone-step{width:42px;height:42px}
       .zone-qty{height:42px;font-size:19px}
@@ -509,12 +512,9 @@
     </div>
   </div>
 
-  <input class="file" id="quickPhoto" type="file" accept="image/*" capture="environment">
   <input class="file" id="batchPhotoInput" type="file" accept="image/*" multiple>
   <input class="file" id="addPhotoInput" type="file" accept="image/*">
-  <input class="file" id="addCameraInput" type="file" accept="image/*" capture="environment">
   <input class="file" id="editPhotoInput" type="file" accept="image/*">
-  <input class="file" id="editCameraInput" type="file" accept="image/*" capture="environment">
 
   <dialog id="addDialog">
     <form class="modal" id="addForm">
@@ -523,7 +523,6 @@
       <div id="addPreview" class="add-preview empty">No photo selected</div>
       <div class="modal-photo-actions">
         <button class="btn soft small" type="button" id="changeAddPhoto">Choose from Library</button>
-        <button class="btn soft small" type="button" id="takeAddPhoto">Take Photo</button>
         <button class="btn soft small" type="button" id="removeAddPhoto">Remove Photo</button>
       </div>
       <div class="modal-grid">
@@ -588,7 +587,7 @@
       <p id="deleteText"></p>
       <div class="modal-actions">
         <button class="btn soft" type="button" data-close="deleteDialog">Cancel</button>
-        <button class="btn danger">Delete Item</button>
+        <button class="btn danger">Delete Permanently</button>
       </div>
     </form>
   </dialog>
@@ -625,9 +624,9 @@
       filterRestockCount:$('#filterRestockCount'),filterAllCount:$('#filterAllCount'),filterFullCount:$('#filterFullCount'),
       inventorySearch:$('#inventorySearch'),clearSearch:$('#clearSearch'),cameraAdd:$('#cameraAdd'),batchAlbumAdd:$('#batchAlbumAdd'),noPhotoAdd:$('#noPhotoAdd'),
       toggleZones:$('#toggleZones'),zoneCount:$('#zoneCount'),addZone:$('#addZone'),addZoneInside:$('#addZoneInside'),zoneManager:$('#zoneManager'),zoneList:$('#zoneList'),expandAllZones:$('#expandAllZones'),collapseAllZones:$('#collapseAllZones'),
-      quickPhoto:$('#quickPhoto'),batchPhotoInput:$('#batchPhotoInput'),addPhotoInput:$('#addPhotoInput'),addCameraInput:$('#addCameraInput'),editPhotoInput:$('#editPhotoInput'),editCameraInput:$('#editCameraInput'),
+      batchPhotoInput:$('#batchPhotoInput'),addPhotoInput:$('#addPhotoInput'),editPhotoInput:$('#editPhotoInput'),
       addDialog:$('#addDialog'),addForm:$('#addForm'),addPreview:$('#addPreview'),addName:$('#addName'),addItemZone:$('#addItemZone'),addCategory:$('#addCategory'),categorySuggestions:$('#categorySuggestions'),addOnSite:$('#addOnSite'),
-      changeAddPhoto:$('#changeAddPhoto'),takeAddPhoto:$('#takeAddPhoto'),removeAddPhoto:$('#removeAddPhoto'),saveAdd:$('#saveAdd'),
+      changeAddPhoto:$('#changeAddPhoto'),removeAddPhoto:$('#removeAddPhoto'),saveAdd:$('#saveAdd'),
       batchDialog:$('#batchDialog'),batchForm:$('#batchForm'),batchItems:$('#batchItems'),batchCount:$('#batchCount'),saveBatch:$('#saveBatch'),
       zoneDialog:$('#zoneDialog'),zoneForm:$('#zoneForm'),zoneDialogTitle:$('#zoneDialogTitle'),zoneName:$('#zoneName'),zoneItemSearch:$('#zoneItemSearch'),zoneItemPicker:$('#zoneItemPicker'),zoneSelectAll:$('#zoneSelectAll'),zoneClearAll:$('#zoneClearAll'),saveZone:$('#saveZone'),
       deleteZoneDialog:$('#deleteZoneDialog'),deleteZoneForm:$('#deleteZoneForm'),deleteZoneText:$('#deleteZoneText'),
@@ -964,7 +963,7 @@
         const rows=items.length?[...categories].map(([category,categoryItems])=>`<div class="zone-category">${esc(category)}</div>${categoryItems.map(item=>{
           const needed=shortage(item),pending=pendingValue(item)!==item.onSiteQty;
           const confirm=pending?'<button class="restock-btn waiting zone-confirm" type="button" disabled>Save count first</button>':needed?`<button class="restock-btn zone-confirm" type="button" data-zone-action="restock" data-item-id="${item.id}">Restocked +${needed}</button>`:'<button class="restock-btn full zone-confirm" type="button" disabled>Full</button>';
-          return `<div class="zone-item-row" data-zone-item-id="${item.id}">${photoMarkup(item.photo,item.name,'zone-thumb')}<div class="zone-item-name"><strong>${esc(item.name)}</strong><span>${esc(statusInfo(item,pendingValue(item)).text)}</span></div>${zoneQuickMarkup(item)}<div class="zone-number zone-current">${item.onSiteQty}<small>On-site</small></div><div class="zone-number zone-full">${item.targetQty}<small>Full</small></div><div class="zone-number zone-missing">${needed}<small>Restock</small></div>${confirm}<div class="zone-item-actions"><button class="zone-move" type="button" data-zone-action="move" data-item-id="${item.id}" ${state.zones.length<2?'disabled':''} aria-label="Send ${esc(item.name)} to another zone">Move</button><button class="btn soft small zone-view" type="button" data-zone-action="view" data-item-id="${item.id}">Details</button></div></div>`
+          return `<div class="zone-item-row" data-zone-item-id="${item.id}">${photoMarkup(item.photo,item.name,'zone-thumb')}<div class="zone-item-name"><strong>${esc(item.name)}</strong><span>${esc(statusInfo(item,pendingValue(item)).text)}</span></div>${zoneQuickMarkup(item)}<div class="zone-number zone-current">${item.onSiteQty}<small>On-site</small></div><div class="zone-number zone-full">${item.targetQty}<small>Full</small></div><div class="zone-number zone-missing">${needed}<small>Restock</small></div>${confirm}<div class="zone-item-actions"><button class="zone-move" type="button" data-zone-action="move" data-item-id="${item.id}" ${state.zones.length<2?'disabled':''} aria-label="Send ${esc(item.name)} to another zone">Move</button><button class="zone-delete-item" type="button" data-zone-action="delete-item" data-item-id="${item.id}" aria-label="Delete ${esc(item.name)} permanently">Delete</button><button class="btn soft small zone-view" type="button" data-zone-action="view" data-item-id="${item.id}">Details</button></div></div>`
         }).join('')}`).join(''):`<div class="zone-empty">${state.searchQuery||state.filter!=='all'?'No matching items in this zone.':'No items yet.'}<br><button class="btn soft small" type="button" data-zone-action="add-item">+ Add item here</button></div>`;
         return `<article class="zone-card${collapsed?' collapsed':''}" data-zone-id="${zone.id}"><header class="zone-card-header"><button class="zone-toggle" type="button" data-zone-action="toggle" aria-expanded="${!collapsed}"><span class="zone-toggle-icon">⌄</span><span class="zone-title"><strong>${esc(zone.name)}</strong><span>${items.length} item${items.length===1?'':'s'} · ${low} low · ${missing} unit${missing===1?'':'s'} to restock</span></span></button><div class="zone-card-actions"><button class="btn soft small" type="button" data-zone-action="edit">Rename</button><button class="icon-btn" type="button" data-zone-action="delete" aria-label="Delete ${esc(zone.name)}">×</button></div></header><div class="zone-card-body">${rows}</div></article>`
       }).join('')
@@ -1020,7 +1019,7 @@
     function renderEditPanel(item,photo,onSite){
       const missing=Math.max(0,item.targetQty-onSite);
       return `<form class="edit-panel" data-edit-form>
-        <div class="detail-photo">${photoMarkup(photo,item.name,'detail-preview')}<div class="photo-actions"><button class="btn soft small" type="button" data-action="edit-photo">Choose from Library</button><button class="btn soft small" type="button" data-action="take-edit-photo">Take Photo</button><button class="btn soft small remove-photo" type="button" data-action="remove-photo" ${photo?'':'disabled'}>Remove Photo</button></div></div>
+        <div class="detail-photo">${photoMarkup(photo,item.name,'detail-preview')}<div class="photo-actions"><button class="btn soft small" type="button" data-action="edit-photo">Choose from Library</button><button class="btn soft small remove-photo" type="button" data-action="remove-photo" ${photo?'':'disabled'}>Remove Photo</button></div></div>
         <div class="edit-fields">
           <label>Zone<select name="zoneId" required>${state.zones.map(zone=>`<option value="${esc(zone.id)}" ${zone.id===item.zoneId?'selected':''}>${esc(zone.name)}</option>`).join('')}</select></label>
           <label>Category<input name="category" maxlength="40" value="${esc(item.category||'General')}" required></label>
@@ -1134,6 +1133,7 @@
         stageOnSite(item,next);scheduleZoneSave(item);return
       }
       if(action==='move'){openMoveDialog(item);return}
+      if(action==='delete-item'){state.deleteId=item.id;els.deleteText.textContent=`“${item.name}” will be permanently deleted from ${zone&&zone.name||'its zone'}, including its photo and complete stock history. This cannot be undone.`;els.deleteDialog.showModal();return}
       if(action==='view'){state.filter='all';state.searchQuery='';els.inventorySearch.value='';document.querySelectorAll('[data-filter]').forEach(filter=>filter.classList.toggle('active',filter.dataset.filter==='all'));state.expandedId=item.id;closeEditTemp();render();return}
       if(action==='restock'){const amount=shortage(item);if(amount<=0)return;button.disabled=true;if(await commitSnapshot(item,{targetQty:item.targetQty,onSiteQty:item.targetQty},`Restocked +${amount}`,{restocked:true})){delete state.pendingOnSite[item.id];render();notify(`${item.name} restocked by ${amount}.`)}else button.disabled=false}
     });
@@ -1156,14 +1156,10 @@
     els.cameraAdd.addEventListener('click',()=>openAdd(null));
     els.batchAlbumAdd.addEventListener('click',()=>els.batchPhotoInput.click());
     els.noPhotoAdd.addEventListener('click',()=>openAdd(null));
-    els.quickPhoto.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'quick');event.target.value=''});
     els.batchPhotoInput.addEventListener('change',async event=>{await openBatch(event.target.files);event.target.value=''});
     els.addPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'add');event.target.value=''});
-    els.addCameraInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'add');event.target.value=''});
     els.editPhotoInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'edit');event.target.value=''});
-    els.editCameraInput.addEventListener('change',async event=>{await processPhoto(event.target.files[0],'edit');event.target.value=''});
     els.changeAddPhoto.addEventListener('click',()=>els.addPhotoInput.click());
-    els.takeAddPhoto.addEventListener('click',()=>els.addCameraInput.click());
     els.removeAddPhoto.addEventListener('click',()=>{disposePhoto(state.addPhoto);state.addPhoto=null;setAddPreview()});
 
     els.batchItems.addEventListener('input',event=>{
@@ -1236,7 +1232,6 @@
         }
         if(action==='delete'){closeSettings(actionButton);state.deleteId=id;els.deleteText.textContent=`“${item.name}” and its stock history will be permanently deleted.`;els.deleteDialog.showModal();return}
         if(action==='edit-photo'){els.editPhotoInput.click();return}
-        if(action==='take-edit-photo'){els.editCameraInput.click();return}
         if(action==='remove-photo'){if(state.editPhotoTemp&&state.editPhotoTemp.url)disposePhoto(state.editPhotoTemp);state.editPhotoTemp=null;render();return}
         if(action==='cancel-edit'){delete state.pendingOnSite[id];state.expandedId=null;closeEditTemp();render();return}
       }
@@ -1264,7 +1259,7 @@
     });
     els.deleteForm.addEventListener('submit',async event=>{
       event.preventDefault();const index=state.items.findIndex(item=>item.id===state.deleteId);if(index<0)return;const removed=state.items[index],submit=els.deleteForm.querySelector('.danger');submit.disabled=true;
-      try{const changedZones=state.zones.filter(zone=>zone.itemIds.includes(removed.id)).map(zone=>({...zone,itemIds:zone.itemIds.filter(id=>id!==removed.id),updatedAt:new Date().toISOString()}));await removeItemAndZoneRefs(removed.id,changedZones);changedZones.forEach(changed=>Object.assign(state.zones.find(zone=>zone.id===changed.id),changed));clearTimeout(zoneSaveTimers.get(removed.id));zoneSaveTimers.delete(removed.id);zoneSaveTokens.delete(removed.id);state.items.splice(index,1);revokeUrl(removed.photo);if(state.expandedId===removed.id){state.expandedId=null;closeEditTemp()}delete state.pendingOnSite[removed.id];state.deleteId=null;els.deleteDialog.close();render();notify(`Deleted ${removed.name}.`)}
+      try{clearTimeout(zoneSaveTimers.get(removed.id));zoneSaveTimers.delete(removed.id);zoneSaveTokens.set(removed.id,(zoneSaveTokens.get(removed.id)||0)+1);const activeSave=zoneSavePromises.get(removed.id);if(activeSave)await activeSave;const changedZones=state.zones.filter(zone=>zone.itemIds.includes(removed.id)).map(zone=>({...zone,itemIds:zone.itemIds.filter(id=>id!==removed.id),updatedAt:new Date().toISOString()}));await removeItemAndZoneRefs(removed.id,changedZones);changedZones.forEach(changed=>Object.assign(state.zones.find(zone=>zone.id===changed.id),changed));zoneSaveTokens.delete(removed.id);zoneSavePromises.delete(removed.id);state.items.splice(index,1);revokeUrl(removed.photo);if(state.expandedId===removed.id){state.expandedId=null;closeEditTemp()}delete state.pendingOnSite[removed.id];state.deleteId=null;els.deleteDialog.close();render();notify(`Permanently deleted ${removed.name}.`)}
       catch(error){storageFailure(error)}finally{submit.disabled=false}
     });
     document.addEventListener('click',event=>{const dialogId=event.target.dataset.close;if(dialogId)document.getElementById(dialogId).close();if(!event.target.closest('.settings'))document.querySelectorAll('.settings[open]').forEach(menu=>menu.open=false)});
